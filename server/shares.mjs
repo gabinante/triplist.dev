@@ -1,34 +1,8 @@
 import crypto from 'node:crypto'
 import express from 'express'
-import { Resend } from 'resend'
+import { emailEnabled, escapeHtml as esc, sendEmail } from './email.mjs'
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
-const FROM = process.env.RESEND_FROM ?? 'TripList <invites@triplist.dev>'
 const APP_URL = process.env.BETTER_AUTH_URL ?? 'https://triplist.dev'
-
-const esc = s =>
-  String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
-
-function inviteEmail({ ownerName, ownerEmail, tripName, itemCount, message, shareId, recipient }) {
-  const link = `${APP_URL}/?share=${shareId}`
-  return {
-    subject: `${ownerName} shared "${tripName}" with you on TripList`,
-    html: `
-<div style="background:#161814;color:#e5e7e2;font-family:-apple-system,'Segoe UI',sans-serif;padding:40px 24px;border-radius:16px;max-width:520px;margin:0 auto">
-  <p style="font-size:13px;letter-spacing:2px;text-transform:uppercase;color:#8fa65c;margin:0 0 8px">🏕️ TripList</p>
-  <h1 style="font-size:22px;margin:0 0 16px;color:#f5f6f4">${esc(ownerName)} invited you to pack for<br>&ldquo;${esc(tripName)}&rdquo;</h1>
-  <p style="color:#a8b0a1;font-size:14px;line-height:1.6;margin:0 0 12px">
-    A packing list with <strong style="color:#c8d6ac">${itemCount} items</strong> is waiting for you,
-    shared by ${esc(ownerName)} (${esc(ownerEmail)}).
-  </p>
-  ${message ? `<p style="border-left:3px solid #74893f;padding:8px 14px;margin:0 0 16px;color:#cbd0c6;font-size:14px;font-style:italic">&ldquo;${esc(message)}&rdquo;</p>` : ''}
-  <a href="${link}" style="display:inline-block;background:#74893f;color:#f3f6ee;text-decoration:none;font-weight:600;font-size:14px;padding:12px 22px;border-radius:12px;margin:8px 0 20px">View the invite</a>
-  <p style="color:#697263;font-size:12px;line-height:1.6;margin:0">
-    Sign in (or create an account) with this email address — ${esc(recipient)} — to accept or decline.
-  </p>
-</div>`,
-  }
-}
 
 /** Mounts the trip-sharing API. Requires auth to be enabled. */
 export async function mountShares(app, { auth, pool }) {
@@ -92,23 +66,19 @@ export async function mountShares(app, { auth, pool }) {
     )
 
     let emailed = false
-    if (resend) {
-      try {
-        const { subject, html } = inviteEmail({
-          ownerName: session.user.name || session.user.email,
-          ownerEmail: session.user.email,
-          tripName: snapshot.trip.name,
-          itemCount: snapshot.items.length,
-          message: message?.slice(0, 500),
-          shareId: id,
-          recipient,
-        })
-        const { error } = await resend.emails.send({ from: FROM, to: recipient, subject, html })
-        emailed = !error
-        if (error) console.error('resend error:', error)
-      } catch (err) {
-        console.error('resend send failed:', err.message)
-      }
+    if (emailEnabled) {
+      const ownerName = session.user.name || session.user.email
+      const trimmed = message?.slice(0, 500)
+      emailed = await sendEmail({
+        to: recipient,
+        subject: `${ownerName} shared "${snapshot.trip.name}" with you on TripList`,
+        preheader: `A ${snapshot.items.length}-item packing list is waiting for you.`,
+        heading: `${esc(ownerName)} invited you to pack for<br>&ldquo;${esc(snapshot.trip.name)}&rdquo;`,
+        bodyHtml: `A packing list with <strong style="color:#c8d6ac">${snapshot.items.length} items</strong> is waiting for you, shared by ${esc(ownerName)} (${esc(session.user.email)}).`,
+        quote: trimmed ? esc(trimmed) : undefined,
+        cta: { label: 'View the invite', url: `${APP_URL}/?share=${id}` },
+        footnote: `Sign in (or create an account) with this email address — ${esc(recipient)} — to accept or decline.`,
+      })
     }
     res.json({ ok: true, id, emailed })
   })
