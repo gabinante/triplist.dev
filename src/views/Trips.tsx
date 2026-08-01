@@ -13,9 +13,9 @@ import {
   Tent,
   Trash2,
 } from 'lucide-react'
-import { tripItems, tripProgress, useStore } from '../store'
-import type { Item, Trip } from '../types'
-import { Button, Chip, DynamicIcon, GlassPanel, Modal, ProgressRing } from '../components/ui'
+import { makeId, tripItems, tripProgress, useStore } from '../store'
+import type { Item, ItemKind, Trip } from '../types'
+import { Button, Chip, DynamicIcon, GlassPanel, Modal, ProgressRing, inputClass } from '../components/ui'
 import { useAuthAvailable, useSession } from '../lib/auth-client'
 import { AuthModal } from '../components/AuthModal'
 import { ShareModal } from '../components/ShareModal'
@@ -370,17 +370,23 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
     const tagSet = new Set(trip.tagIds)
     const byGroup = new Map<string, Item[]>()
     for (const item of list) {
+      // Prefer the trip's own lists, then well-known lists, then any custom
+      // list the item belongs to — so custom lists group under their own name.
       const groupTag =
         GROUP_ORDER.find(g => tagSet.has(g) && item.tags.includes(g)) ??
         GROUP_ORDER.find(g => item.tags.includes(g)) ??
+        item.tags.find(t => tagSet.has(t)) ??
+        item.tags[0] ??
         'other'
       const arr = byGroup.get(groupTag) ?? []
       arr.push(item)
       byGroup.set(groupTag, arr)
     }
-    return [...byGroup.entries()].sort(
-      (a, b) => GROUP_ORDER.indexOf(a[0]) - GROUP_ORDER.indexOf(b[0]),
-    )
+    const rank = (id: string) => {
+      const i = GROUP_ORDER.indexOf(id)
+      return i === -1 ? GROUP_ORDER.length : i
+    }
+    return [...byGroup.entries()].sort((a, b) => rank(a[0]) - rank(b[0]))
   }, [list, trip.tagIds])
 
   const update = (patch: Partial<Trip>) => dispatch({ type: 'updateTrip', trip: { ...trip, ...patch } })
@@ -580,6 +586,10 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
 function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onClose: () => void }) {
   const { state, dispatch } = useStore()
   const [query, setQuery] = useState('')
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newKind, setNewKind] = useState<ItemKind>('gear')
+  const [newTags, setNewTags] = useState<string[]>([])
 
   const currentIds = new Set(tripItems(trip, state.items).map(i => i.id))
   const candidates = state.items.filter(
@@ -596,34 +606,125 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
       },
     })
 
+  const startCreating = () => {
+    setNewName(query.trim())
+    setNewKind('gear')
+    setNewTags([])
+    setCreating(true)
+  }
+
+  const createAndAdd = () => {
+    const item: Item = {
+      id: makeId(newName),
+      name: newName.trim(),
+      kind: newKind,
+      stock: null,
+      tags: newTags,
+    }
+    dispatch({ type: 'addItem', item })
+    add(item.id)
+    setCreating(false)
+    setQuery('')
+  }
+
+  const close = () => {
+    setCreating(false)
+    setQuery('')
+    onClose()
+  }
+
   return (
-    <Modal open={open} onClose={onClose} title="Add gear to this trip">
-      <div className="relative mb-3">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-bark-500" />
-        <input
-          autoFocus
-          className="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 pl-9 pr-3 text-sm text-bark-50 placeholder-bark-500 outline-none focus:border-moss-400/50"
-          placeholder="Search your gear…"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-        />
-      </div>
-      <div className="max-h-80 space-y-1 overflow-y-auto">
-        {candidates.length === 0 && (
-          <p className="py-6 text-center text-sm text-bark-500">Nothing left to add — it's all on the list.</p>
-        )}
-        {candidates.map(item => (
-          <button
-            key={item.id}
-            onClick={() => add(item.id)}
-            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-bark-200 transition-colors hover:bg-moss-500/15 hover:text-moss-200 cursor-pointer"
-          >
-            <Plus className="h-4 w-4 text-moss-400" />
-            <span className="flex-1">{item.name}</span>
-            <span className="text-[10px] text-bark-500">{item.tags.join(', ')}</span>
-          </button>
-        ))}
-      </div>
+    <Modal open={open} onClose={close} title="Add gear to this trip">
+      {creating ? (
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2">
+              <label className="mb-1.5 block text-xs font-medium text-bark-400">Name</label>
+              <input
+                autoFocus
+                className={inputClass}
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                placeholder="e.g. Headlamp"
+                onKeyDown={e => e.key === 'Enter' && newName.trim() && createAndAdd()}
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-bark-400">Type</label>
+              <div className="flex gap-1.5 pt-1">
+                <Chip active={newKind === 'gear'} onClick={() => setNewKind('gear')}>Gear</Chip>
+                <Chip active={newKind === 'consumable'} onClick={() => setNewKind('consumable')}>Consumable</Chip>
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-bark-400">
+              Add to lists — it'll be packed under the first one
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {state.tags.map(tag => (
+                <Chip
+                  key={tag.id}
+                  active={newTags.includes(tag.id)}
+                  onClick={() =>
+                    setNewTags(
+                      newTags.includes(tag.id) ? newTags.filter(t => t !== tag.id) : [...newTags, tag.id],
+                    )
+                  }
+                >
+                  <DynamicIcon name={tag.icon} className="h-3 w-3" />
+                  {tag.name}
+                </Chip>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] text-bark-500">
+              Pick as many as fit — the item joins those lists for future trips too. None picked? It still
+              joins this trip, grouped under Other.
+            </p>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="ghost" onClick={() => setCreating(false)}>Back</Button>
+            <Button onClick={createAndAdd} disabled={newName.trim() === ''}>
+              Create & add to trip
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="relative mb-3">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-bark-500" />
+            <input
+              autoFocus
+              className="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 pl-9 pr-3 text-sm text-bark-50 placeholder-bark-500 outline-none focus:border-moss-400/50"
+              placeholder="Search your gear…"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+            />
+          </div>
+          <div className="max-h-80 space-y-1 overflow-y-auto">
+            {candidates.map(item => (
+              <button
+                key={item.id}
+                onClick={() => add(item.id)}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-bark-200 transition-colors hover:bg-moss-500/15 hover:text-moss-200 cursor-pointer"
+              >
+                <Plus className="h-4 w-4 text-moss-400" />
+                <span className="flex-1">{item.name}</span>
+                <span className="text-[10px] text-bark-500">{item.tags.join(', ')}</span>
+              </button>
+            ))}
+            <button
+              onClick={startCreating}
+              className="flex w-full items-center gap-2 rounded-lg border border-dashed border-white/15 px-3 py-2.5 text-left text-sm text-bark-300 transition-colors hover:border-moss-400/40 hover:bg-moss-500/10 hover:text-moss-200 cursor-pointer"
+            >
+              <Plus className="h-4 w-4 text-moss-400" />
+              <span className="flex-1">
+                {query.trim() ? `Create "${query.trim()}" as new gear` : 'Create something new'}
+              </span>
+            </button>
+          </div>
+        </>
+      )}
     </Modal>
   )
 }
