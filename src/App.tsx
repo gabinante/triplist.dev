@@ -6,7 +6,10 @@ import { TripsView } from './views/Trips'
 import { GearView } from './views/Gear'
 import { StylesView } from './views/Styles'
 import { AccountSection } from './components/Account'
-import { useInbox } from './lib/shares'
+import { claimShare, useInbox } from './lib/shares'
+import { useSession } from './lib/auth-client'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Check } from 'lucide-react'
 
 type View = 'plan' | 'trips' | 'gear' | 'styles'
 
@@ -21,18 +24,36 @@ export default function App() {
   const [view, setView] = useState<View>('plan')
   const [selectedTrip, setSelectedTrip] = useState<string | null>(null)
   const [wizardKey, setWizardKey] = useState(0)
-  const [fromShareLink, setFromShareLink] = useState(false)
+  const [shareLinkId, setShareLinkId] = useState<string | null>(null)
+  const [verifiedToast, setVerifiedToast] = useState(false)
   const { invites, refresh: refreshInbox } = useInbox()
+  const { data: session } = useSession()
 
   // Invite-email links land on /?share=… — go straight to My Trips.
+  // Email-confirmation links land on /?verified=1.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.has('share')) {
-      setFromShareLink(true)
+      setShareLinkId(params.get('share'))
       setView('trips')
+    }
+    if (params.get('verified') === '1') {
+      setVerifiedToast(true)
+      setTimeout(() => setVerifiedToast(false), 5000)
+    }
+    if (params.has('share') || params.has('verified')) {
       window.history.replaceState(null, '', window.location.pathname)
     }
   }, [])
+
+  // Once signed in while holding a share link, attach the invite to this
+  // account — transferring it if it was sent to a different email.
+  useEffect(() => {
+    if (!shareLinkId || !session?.user) return
+    claimShare(shareLinkId)
+      .then(() => refreshInbox())
+      .finally(() => setShareLinkId(null))
+  }, [shareLinkId, session?.user, refreshInbox])
 
   const openTrip = (id: string | null) => {
     setSelectedTrip(id)
@@ -96,12 +117,24 @@ export default function App() {
               onPlanNew={planNew}
               invites={invites}
               onInboxChange={refreshInbox}
-              fromShareLink={fromShareLink}
+              shareLinkId={shareLinkId}
             />
           )}
           {view === 'gear' && <GearView />}
           {view === 'styles' && <StylesView />}
         </main>
+        <AnimatePresence>
+          {verifiedToast && (
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 16 }}
+              className="glass fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-2xl px-4 py-3 text-sm text-moss-200"
+            >
+              <Check className="h-4 w-4 text-moss-300" /> Email confirmed — you're all set.
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </StoreProvider>
   )

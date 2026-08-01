@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   AlertTriangle,
@@ -19,8 +19,8 @@ import { Button, Chip, DynamicIcon, GlassPanel, Modal, ProgressRing } from '../c
 import { useAuthAvailable, useSession } from '../lib/auth-client'
 import { AuthModal } from '../components/AuthModal'
 import { ShareModal } from '../components/ShareModal'
-import { respondToInvite } from '../lib/shares'
-import type { Invite } from '../lib/shares'
+import { fetchShareLink, respondToInvite } from '../lib/shares'
+import type { Invite, ShareLinkInfo } from '../lib/shares'
 import { Inbox, Share2 } from 'lucide-react'
 
 const GROUP_ORDER = [
@@ -49,14 +49,14 @@ export function TripsView({
   onPlanNew,
   invites,
   onInboxChange,
-  fromShareLink,
+  shareLinkId,
 }: {
   selectedId: string | null
   onSelect: (id: string | null) => void
   onPlanNew: () => void
   invites: Invite[]
   onInboxChange: () => void
-  fromShareLink: boolean
+  shareLinkId: string | null
 }) {
   const { state } = useStore()
   const trip = state.trips.find(t => t.id === selectedId)
@@ -67,7 +67,7 @@ export function TripsView({
       onPlanNew={onPlanNew}
       invites={invites}
       onInboxChange={onInboxChange}
-      fromShareLink={fromShareLink}
+      shareLinkId={shareLinkId}
     />
   )
 }
@@ -150,18 +150,68 @@ function InviteInbox({ invites, onInboxChange }: { invites: Invite[]; onInboxCha
   )
 }
 
-function ShareLinkPrompt() {
+function ShareLinkPrompt({ shareId }: { shareId: string }) {
+  const [info, setInfo] = useState<ShareLinkInfo | null>(null)
+  const [loaded, setLoaded] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
+  const [otherAccount, setOtherAccount] = useState(false)
+
+  useEffect(() => {
+    fetchShareLink(shareId)
+      .then(setInfo)
+      .finally(() => setLoaded(true))
+  }, [shareId])
+
+  if (!loaded) return null
+  if (!info || info.status !== 'pending') {
+    return (
+      <div className="mb-5 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-bark-400">
+        That invite link isn't active anymore — it may have already been accepted or declined.
+      </div>
+    )
+  }
+
+  // Existing account at the invited email → straight to sign-in, prefilled.
+  // No account yet → signup, prefilled. "Different email" path signs into any
+  // account; the invite transfers to it automatically after login.
+  const mode = otherAccount ? 'signin' : info.recipient_has_account ? 'signin' : 'signup'
+  const prefill = otherAccount ? undefined : info.recipient_email
+
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-moss-400/25 bg-moss-500/10 px-4 py-3">
-        <p className="text-sm text-moss-200">
-          <span className="font-semibold">Someone shared a trip with you!</span>{' '}
-          <span className="text-moss-300/90">Sign in with the email it was sent to and it'll be waiting here.</span>
-        </p>
-        <Button onClick={() => setAuthOpen(true)}>Sign in to see it</Button>
+      <div className="mb-5 rounded-2xl border border-moss-400/25 bg-moss-500/10 px-4 py-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-moss-200">
+            <span className="font-semibold">
+              {info.owner_name} shared "{info.trip_name}" with you
+            </span>{' '}
+            <span className="text-moss-300/90">— {info.item_count} items, waiting for you to accept.</span>
+          </p>
+          <Button
+            onClick={() => {
+              setOtherAccount(false)
+              setAuthOpen(true)
+            }}
+          >
+            {info.recipient_has_account ? 'Sign in to accept' : 'Create account to accept'}
+          </Button>
+        </div>
+        <button
+          onClick={() => {
+            setOtherAccount(true)
+            setAuthOpen(true)
+          }}
+          className="mt-1.5 text-xs text-bark-400 underline-offset-2 hover:text-moss-300 hover:underline cursor-pointer"
+        >
+          Have an account under a different email? Sign in with it and we'll move the invite over.
+        </button>
       </div>
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode="signup" />
+      <AuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+        initialMode={mode}
+        prefillEmail={prefill}
+      />
     </>
   )
 }
@@ -193,18 +243,18 @@ function TripGrid({
   onPlanNew,
   invites,
   onInboxChange,
-  fromShareLink,
+  shareLinkId,
 }: {
   onSelect: (id: string) => void
   onPlanNew: () => void
   invites: Invite[]
   onInboxChange: () => void
-  fromShareLink: boolean
+  shareLinkId: string | null
 }) {
   const { state, dispatch } = useStore()
   const { data: session } = useSession()
 
-  if (state.trips.length === 0 && invites.length === 0 && !fromShareLink) {
+  if (state.trips.length === 0 && invites.length === 0 && !shareLinkId) {
     return (
       <div className="mx-auto max-w-md pt-16 text-center">
         <div className="mx-auto mb-4 w-fit rounded-2xl bg-moss-500/15 p-4 text-moss-300">
@@ -229,7 +279,7 @@ function TripGrid({
           </span>
         </Button>
       </div>
-      {fromShareLink && !session?.user && <ShareLinkPrompt />}
+      {shareLinkId && !session?.user && <ShareLinkPrompt shareId={shareLinkId} />}
       <InviteInbox invites={invites} onInboxChange={onInboxChange} />
       <SaveTripsNudge />
       <div className="grid gap-4 sm:grid-cols-2">

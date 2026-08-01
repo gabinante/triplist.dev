@@ -29,6 +29,27 @@ export async function shareTrip(email: string, message: string, snapshot: TripSn
   return body as { ok: true; id: string; emailed: boolean }
 }
 
+export interface ShareLinkInfo {
+  status: 'pending' | 'accepted' | 'declined'
+  recipient_email: string
+  trip_name: string
+  item_count: number
+  owner_name: string
+  recipient_has_account: boolean
+}
+
+export async function fetchShareLink(id: string): Promise<ShareLinkInfo | null> {
+  const res = await fetch(`/api/shares/link/${id}`)
+  if (!res.ok) return null
+  return res.json()
+}
+
+/** Transfer/attach a pending invite to the signed-in account (no-op if it already matches). */
+export async function claimShare(id: string): Promise<boolean> {
+  const res = await fetch(`/api/shares/${id}/claim`, { method: 'POST' })
+  return res.ok
+}
+
 export async function respondToInvite(id: string, action: 'accept' | 'decline') {
   const res = await fetch(`/api/shares/${id}/respond`, {
     method: 'POST',

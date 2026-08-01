@@ -41,15 +41,24 @@ body {
 }
 
 /* Fixed ambient background: dark grey canvas with soft moss glows */
-.ambient {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
+.ambient,
+.ambient-fill {
   background:
     radial-gradient(45rem 30rem at 85% -10%, rgba(116, 137, 63, 0.16), transparent 60%),
     radial-gradient(40rem 28rem at -10% 40%, rgba(90, 107, 48, 0.13), transparent 60%),
     radial-gradient(50rem 35rem at 50% 110%, rgba(50, 58, 33, 0.35), transparent 65%),
     var(--color-bark-950);
+}
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+}
+/* Same canvas, but filling an overlay container (e.g. the auth screen) */
+.ambient-fill {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
 }
 
 .glass {

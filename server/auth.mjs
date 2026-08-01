@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth'
 import pg from 'pg'
+import { escapeHtml as esc, sendEmail } from './email.mjs'
 
 // Auth requires the database; without DATABASE_URL (e.g. plain local dev)
 // the server runs guest-only and auth endpoints are disabled.
@@ -23,6 +24,27 @@ export const auth = authEnabled
       ],
       emailAndPassword: {
         enabled: true,
+      },
+      emailVerification: {
+        sendOnSignUp: true,
+        autoSignInAfterVerification: true,
+        async sendVerificationEmail({ user, url }) {
+          // Land back on the app with a confirmation toast after verifying.
+          const verifyUrl = new URL(url)
+          verifyUrl.searchParams.set('callbackURL', '/?verified=1')
+          const firstName = (user.name || '').split(' ')[0]
+          await sendEmail({
+            to: user.email,
+            subject: 'Welcome to TripList — confirm your email',
+            preheader: 'Layered packing lists for every kind of trip.',
+            heading: `Welcome to TripList${firstName ? `, ${esc(firstName)}` : ''} 🏕️`,
+            bodyHtml:
+              'Your lists and trips now sync to your account and follow you to every device. ' +
+              'Confirm your email to secure the account and make sure trip invites from friends reach you.',
+            cta: { label: 'Confirm my email', url: verifyUrl.toString() },
+            footnote: "If you didn't create a TripList account, you can safely ignore this email.",
+          })
+        },
       },
     })
   : null

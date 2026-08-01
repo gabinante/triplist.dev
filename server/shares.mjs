@@ -83,6 +83,39 @@ export async function mountShares(app, { auth, pool }) {
     res.json({ ok: true, id, emailed })
   })
 
+  // Public metadata for the share-link landing flow. The share id is an
+  // unguessable capability delivered by email, so the holder is treated as
+  // the intended recipient.
+  app.get('/api/shares/link/:id', async (req, res) => {
+    const { rows } = await pool.query(
+      `select s.status, s.recipient_email,
+              s.trip_snapshot->'trip'->>'name' as trip_name,
+              jsonb_array_length(s.trip_snapshot->'items') as item_count,
+              u.name as owner_name,
+              exists(select 1 from "user" r where lower(r.email) = s.recipient_email) as recipient_has_account
+       from trip_share s join "user" u on u.id = s.owner_id
+       where s.id = $1`,
+      [req.params.id],
+    )
+    if (rows.length === 0) return res.status(404).json({ error: 'invite not found' })
+    res.json(rows[0])
+  })
+
+  // Transfer a pending invite to the signed-in account. No-op when the
+  // session email already matches; requires possession of the share link.
+  app.post('/api/shares/:id/claim', async (req, res) => {
+    const session = await requireSession(req, res)
+    if (!session) return
+    const { rows } = await pool.query(
+      `update trip_share set recipient_email = $1
+       where id = $2 and status = 'pending'
+       returning id`,
+      [session.user.email.toLowerCase(), req.params.id],
+    )
+    if (rows.length === 0) return res.status(404).json({ error: 'invite not found or already handled' })
+    res.json({ ok: true })
+  })
+
   app.get('/api/shares/inbox', async (req, res) => {
     const session = await requireSession(req, res)
     if (!session) return

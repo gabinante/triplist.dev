@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Armchair, Backpack, Bed, Bike, Briefcase, Building2, Car, Coffee, Compass, CookingPot, Dog,
   Droplets, Fish, Flame, Gamepad2, Laptop, MapPin, Moon, Mountain, Music, Package, PartyPopper,
@@ -121,7 +122,8 @@ export function Modal({
   title: string
   children: ReactNode
 }) {
-  return (
+  // Portal to <body> so backdrop-filter ancestors can't trap the overlay.
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -149,7 +151,8 @@ export function Modal({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   )
 }
 
