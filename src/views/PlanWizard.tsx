@@ -109,24 +109,6 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
                 )}
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                {stepIndex === 0 &&
-                  autoLists.map(tag => (
-                    <div key={tag.id} className="glass glass-active relative rounded-2xl p-5 text-left">
-                      <div className="flex items-start justify-between">
-                        <div className="rounded-xl bg-moss-500/30 p-2.5 text-moss-200">
-                          <DynamicIcon name={tag.icon} className="h-6 w-6" />
-                        </div>
-                        <span className="rounded-full bg-moss-400 p-1 text-bark-950">
-                          <Check className="h-3.5 w-3.5" />
-                        </span>
-                      </div>
-                      <h3 className="mt-3 font-semibold text-bark-50">{tag.name}</h3>
-                      <p className="mt-1 text-sm text-bark-400">{tag.description}</p>
-                      <span className="mt-2 inline-block rounded-full bg-moss-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-moss-300">
-                        On every trip
-                      </span>
-                    </div>
-                  ))}
                 {step.cards.map(card => {
                   const active = (picks[step.id] ?? []).includes(card.id)
                   return (
@@ -192,17 +174,32 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
                   <p className="mb-2 text-xs font-medium text-bark-400">
                     Layered lists — <span className="text-moss-300">{itemCount} items</span> on this packing list
                   </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {chosenTags.map(tagId => {
-                      const tag = state.tags.find(t => t.id === tagId)
-                      return (
-                        <Chip key={tagId} active>
-                          {tag && <DynamicIcon name={tag.icon} className="h-3 w-3" />}
-                          {tag?.name ?? tagId}
-                        </Chip>
-                      )
-                    })}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {chosenTags
+                      .filter(tagId => !autoLists.some(t => t.id === tagId))
+                      .map(tagId => {
+                        const tag = state.tags.find(t => t.id === tagId)
+                        return (
+                          <Chip key={tagId} active>
+                            {tag && <DynamicIcon name={tag.icon} className="h-3 w-3" />}
+                            {tag?.name ?? tagId}
+                          </Chip>
+                        )
+                      })}
+                    {autoLists.map(tag => (
+                      <Chip key={tag.id} className="border-moss-400/30 bg-moss-500/10 text-moss-300">
+                        <DynamicIcon name={tag.icon} className="h-3 w-3" />
+                        {tag.name}
+                        <span className="text-[9px] font-semibold uppercase tracking-wide text-moss-400/80">auto</span>
+                      </Chip>
+                    ))}
                   </div>
+                  {autoLists.length > 0 && (
+                    <p className="mt-2 text-[11px] text-bark-500">
+                      {autoLists.map(t => t.name).join(', ')} {autoLists.length === 1 ? 'is' : 'are'} added to every
+                      trip automatically.
+                    </p>
+                  )}
                 </div>
               </GlassPanel>
             </>
