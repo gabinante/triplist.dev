@@ -34,3 +34,14 @@ to change which lists it pulls in.
 ## Stack
 
 Vite · React 18 · TypeScript · Tailwind CSS 4 · framer-motion · lucide-react
+Express server (`server/index.mjs`) serving the built SPA + `/api/health`.
+
+## Deployment
+
+Hosted on Fly.io (app `triplist`, region sjc) with Fly Managed Postgres (`triplist-db`)
+attached as `DATABASE_URL` — the future backing store for shared lists / group planning.
+DNS lives in Cloudflare, pointed at Fly (grey-cloud/DNS-only; Fly terminates TLS).
+
+- Merges to `main` auto-deploy via GitHub Actions (`.github/workflows/deploy.yml`,
+  authenticated by the `FLY_API_TOKEN` repo secret — a deploy token scoped to the app).
+- Manual deploy: `fly deploy --remote-only`.

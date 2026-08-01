@@ -8,6 +8,14 @@ list layers picked via a card wizard. See README.md for architecture.
 - `npm run dev` — dev server
 - `npm run build` — typecheck (`tsc -b`) + production build
 - `npx tsc --noEmit` — typecheck only
+- `npm start` — serve the built app (Express, `server/index.mjs`)
+
+## Deployment
+
+Fly.io app `triplist` (sjc) + Fly Managed Postgres `triplist-db` (attached as
+`DATABASE_URL`). triplist.dev DNS is in Cloudflare, grey-cloud only — Fly terminates TLS.
+Merges to `main` auto-deploy via GitHub Actions (repo secret `FLY_API_TOKEN`).
+Repo: https://github.com/gabinante/triplist.dev
 
 ## Architecture notes
 
