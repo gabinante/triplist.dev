@@ -1,5 +1,37 @@
-import type { Tag, WizardStep } from '../types'
-export { seedItems } from './seed-items'
+import type { Item, Tag, WizardStep } from '../types'
+import { rawSeedItems } from './seed-items'
+
+/** Seed items that get used up and need restocking, rather than owned outright. */
+export const CONSUMABLE_IDS = new Set([
+  'toothpaste',
+  'toilet-paper',
+  'paper-towels',
+  'propane',
+  'coffee-filters',
+  'trash-bags',
+  'newspaper',
+  'kindling-firewood',
+  'maya-dust',
+  'ziplocs',
+  'batteries',
+  'sunscreen',
+  'earplugs',
+  'bug-spray',
+  'lighters-matches',
+  'tissues',
+  'baby-wipes',
+  'hand-soap',
+  'shampoo-conditioner-bodywash',
+  'neosporin-medications-allergy',
+  'sponges',
+  'feminine-products',
+  'gaff-tape',
+])
+
+export const seedItems: Item[] = rawSeedItems.map(i => ({
+  ...i,
+  kind: CONSUMABLE_IDS.has(i.id) ? 'consumable' : 'gear',
+}))
 
 export const seedTags: Tag[] = [
   { id: 'always', name: 'Always', icon: 'Star', description: 'The core kit — comes on every trip' },
@@ -14,6 +46,8 @@ export const seedTags: Tag[] = [
   { id: 'fire', name: 'Fire', icon: 'Flame', description: 'Campfire gear — only when fires are allowed' },
   { id: 'water', name: 'Water', icon: 'Waves', description: 'Lake or river gear — boats, boards, paddles' },
   { id: 'solo', name: 'Solo', icon: 'User', description: 'Traveling light, party of one' },
+  { id: 'lan', name: 'LAN', icon: 'Gamepad2', description: 'LAN party — rig, peripherals, cables, caffeine' },
+  { id: 'business', name: 'Business', icon: 'Briefcase', description: 'Work travel — laptop, chargers, presentable clothes' },
 ]
 
 export const wizardSteps: WizardStep[] = [
@@ -21,7 +55,7 @@ export const wizardSteps: WizardStep[] = [
     id: 'style',
     title: 'Trip style',
     prompt: 'What kind of trip is this?',
-    multi: false,
+    multi: true,
     cards: [
       {
         id: 'car-camping',
@@ -50,6 +84,20 @@ export const wizardSteps: WizardStep[] = [
         subtitle: 'All the fancy comforts, none of the roughing it',
         icon: 'Sparkles',
         tags: ['always', 'toiletries', 'glamping', 'kitchen', 'living'],
+      },
+      {
+        id: 'lan-event',
+        title: 'LAN Event',
+        subtitle: 'Rig, peripherals, cables, and caffeine',
+        icon: 'Gamepad2',
+        tags: ['lan'],
+      },
+      {
+        id: 'business-trip',
+        title: 'Business Trip',
+        subtitle: 'Work travel — pack light and presentable',
+        icon: 'Briefcase',
+        tags: ['business', 'toiletries'],
       },
     ],
   },

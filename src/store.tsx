@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useReducer } from 'react'
 import type { ReactNode } from 'react'
-import type { Item, Tag, Trip } from './types'
-import { seedItems, seedTags } from './data/seed'
+import type { Item, Tag, Trip, WizardStep } from './types'
+import { CONSUMABLE_IDS, seedItems, seedTags, wizardSteps } from './data/seed'
 
 interface State {
   items: Item[]
   tags: Tag[]
   trips: Trip[]
+  wizard: WizardStep[]
 }
 
 type Action =
@@ -19,6 +20,7 @@ type Action =
   | { type: 'addTrip'; trip: Trip }
   | { type: 'updateTrip'; trip: Trip }
   | { type: 'deleteTrip'; id: string }
+  | { type: 'setWizard'; wizard: WizardStep[] }
   | { type: 'resetData' }
 
 const STORAGE_KEY = 'triplist-v1'
@@ -26,11 +28,25 @@ const STORAGE_KEY = 'triplist-v1'
 function initialState(): State {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw) as State
+    if (raw) {
+      const state = JSON.parse(raw) as State
+      // migrate items saved before the gear/consumable split
+      state.items = state.items.map(i => ({
+        ...i,
+        kind: i.kind ?? (CONSUMABLE_IDS.has(i.id) ? 'consumable' : 'gear'),
+      }))
+      // migrate saves from before the wizard became configurable,
+      // pulling in any seed lists (lan, business) added alongside it
+      if (!state.wizard) {
+        state.wizard = wizardSteps
+        state.tags = [...state.tags, ...seedTags.filter(t => !state.tags.some(s => s.id === t.id))]
+      }
+      return state
+    }
   } catch {
     // fall through to seed
   }
-  return { items: seedItems, tags: seedTags, trips: [] }
+  return { items: seedItems, tags: seedTags, trips: [], wizard: wizardSteps }
 }
 
 function reducer(state: State, action: Action): State {
@@ -59,6 +75,10 @@ function reducer(state: State, action: Action): State {
         tags: state.tags.filter(t => t.id !== action.id),
         items: state.items.map(i => ({ ...i, tags: i.tags.filter(id => id !== action.id) })),
         trips: state.trips.map(t => ({ ...t, tagIds: t.tagIds.filter(id => id !== action.id) })),
+        wizard: state.wizard.map(s => ({
+          ...s,
+          cards: s.cards.map(c => ({ ...c, tags: c.tags.filter(id => id !== action.id) })),
+        })),
       }
     case 'addTrip':
       return { ...state, trips: [action.trip, ...state.trips] }
@@ -66,8 +86,10 @@ function reducer(state: State, action: Action): State {
       return { ...state, trips: state.trips.map(t => (t.id === action.trip.id ? action.trip : t)) }
     case 'deleteTrip':
       return { ...state, trips: state.trips.filter(t => t.id !== action.id) }
+    case 'setWizard':
+      return { ...state, wizard: action.wizard }
     case 'resetData':
-      return { items: seedItems, tags: seedTags, trips: [] }
+      return { items: seedItems, tags: seedTags, trips: [], wizard: wizardSteps }
   }
 }
 

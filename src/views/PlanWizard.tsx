@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Check, Compass } from 'lucide-react'
-import { wizardSteps } from '../data/seed'
 import { makeId, tripItems, useStore } from '../store'
 import type { Trip } from '../types'
 import { Button, Chip, DynamicIcon, GlassPanel, inputClass } from '../components/ui'
@@ -13,19 +12,20 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
   const [name, setName] = useState('')
   const [date, setDate] = useState('')
 
-  const finalStep = stepIndex === wizardSteps.length
-  const step = wizardSteps[stepIndex]
+  const steps = state.wizard
+  const finalStep = stepIndex === steps.length
+  const step = steps[stepIndex]
 
   const chosenTags = useMemo(() => {
     const tags = new Set<string>()
-    for (const s of wizardSteps) {
+    for (const s of steps) {
       for (const cardId of picks[s.id] ?? []) {
         const card = s.cards.find(c => c.id === cardId)
         card?.tags.forEach(t => tags.add(t))
       }
     }
     return [...tags]
-  }, [picks])
+  }, [picks, steps])
 
   const previewTrip: Trip = useMemo(
     () => ({
@@ -76,7 +76,7 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
     <div className="mx-auto max-w-3xl">
       {/* progress */}
       <div className="mb-8 flex items-center justify-center gap-2">
-        {[...wizardSteps.map(s => s.id), 'details'].map((id, i) => (
+        {[...steps.map(s => s.id), 'details'].map((id, i) => (
           <div
             key={id}
             className={`h-1.5 rounded-full transition-all duration-300 ${
@@ -99,7 +99,11 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
               <div className="mb-6 text-center">
                 <p className="text-xs font-semibold uppercase tracking-widest text-moss-400">{step.title}</p>
                 <h1 className="mt-1 text-2xl font-bold text-bark-50">{step.prompt}</h1>
-                {step.multi && <p className="mt-1 text-sm text-bark-400">Pick all that apply — or none.</p>}
+                {step.multi && (
+                  <p className="mt-1 text-sm text-bark-400">
+                    {step.optional ? 'Pick all that apply — or none.' : 'Pick all that apply.'}
+                  </p>
+                )}
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 {step.cards.map(card => {

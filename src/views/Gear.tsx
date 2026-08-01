@@ -1,52 +1,82 @@
 import { useState } from 'react'
-import { Package, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { AlertTriangle, Minus, Package, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { makeId, useStore } from '../store'
-import type { Item, Tag } from '../types'
-import { Button, Chip, DynamicIcon, GlassPanel, Modal, inputClass } from '../components/ui'
+import type { Item, ItemKind, Tag } from '../types'
+import { Button, Chip, DynamicIcon, GlassPanel, ICON_CHOICES, Modal, inputClass } from '../components/ui'
 
-const TAG_ICONS = [
-  'Star', 'Droplets', 'PartyPopper', 'Tent', 'Compass', 'CookingPot', 'Armchair', 'Sparkles',
-  'Car', 'Flame', 'Waves', 'User', 'Backpack', 'Bike', 'Dog', 'Snowflake', 'Sun', 'TreePine',
-  'Fish', 'Music', 'Zap', 'Package',
-]
+type GearTab = 'gear' | 'consumables' | 'lists'
 
 export function GearView() {
-  const [tab, setTab] = useState<'gear' | 'lists'>('gear')
+  const { state } = useStore()
+  const [tab, setTab] = useState<GearTab>('gear')
+  const outCount = state.items.filter(i => i.kind === 'consumable' && i.stock === 0).length
+
   return (
     <div className="mx-auto max-w-4xl">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-bark-50">Gear & Lists</h1>
         <div className="glass flex rounded-xl p-1">
-          {(['gear', 'lists'] as const).map(t => (
+          {(
+            [
+              { id: 'gear', label: 'Gear' },
+              { id: 'consumables', label: 'Consumables' },
+              { id: 'lists', label: 'Lists' },
+            ] as const
+          ).map(t => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-all cursor-pointer ${
-                tab === t ? 'bg-moss-500/70 text-moss-50 shadow' : 'text-bark-400 hover:text-bark-200'
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`relative rounded-lg px-4 py-1.5 text-sm font-medium transition-all cursor-pointer ${
+                tab === t.id ? 'bg-moss-500/70 text-moss-50 shadow' : 'text-bark-400 hover:text-bark-200'
               }`}
             >
-              {t === 'gear' ? 'All Gear' : 'Lists'}
+              {t.label}
+              {t.id === 'consumables' && outCount > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-bark-950">
+                  {outCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
       </div>
-      {tab === 'gear' ? <GearList /> : <ListManager />}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={tab}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.15 }}
+        >
+          {tab === 'lists' ? <ListManager /> : <ItemList kind={tab === 'gear' ? 'gear' : 'consumable'} />}
+        </motion.div>
+      </AnimatePresence>
     </div>
   )
 }
 
-function GearList() {
+function ItemList({ kind }: { kind: ItemKind }) {
   const { state, dispatch } = useStore()
   const [query, setQuery] = useState('')
   const [filterTag, setFilterTag] = useState<string | null>(null)
   const [editing, setEditing] = useState<Item | null>(null)
   const [creating, setCreating] = useState(false)
 
-  const filtered = state.items.filter(
+  const ofKind = state.items.filter(i => i.kind === kind)
+  const filtered = ofKind.filter(
     i =>
       i.name.toLowerCase().includes(query.toLowerCase()) &&
       (filterTag === null || i.tags.includes(filterTag)),
   )
+  const sorted =
+    kind === 'consumable'
+      ? [...filtered].sort((a, b) => Number(b.stock === 0) - Number(a.stock === 0))
+      : filtered
+  const outOfStock = kind === 'consumable' ? ofKind.filter(i => i.stock === 0) : []
+
+  const setStock = (item: Item, stock: number) =>
+    dispatch({ type: 'updateItem', item: { ...item, stock: Math.max(0, stock) } })
 
   return (
     <>
@@ -55,72 +85,138 @@ function GearList() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-bark-500" />
           <input
             className="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 pl-9 pr-3 text-sm text-bark-50 placeholder-bark-500 outline-none focus:border-moss-400/50"
-            placeholder="Search gear…"
+            placeholder={kind === 'gear' ? 'Search gear…' : 'Search consumables…'}
             value={query}
             onChange={e => setQuery(e.target.value)}
           />
         </div>
         <Button onClick={() => setCreating(true)}>
           <span className="flex items-center gap-1.5">
-            <Plus className="h-4 w-4" /> Add gear
+            <Plus className="h-4 w-4" /> Add {kind === 'gear' ? 'gear' : 'consumable'}
           </span>
         </Button>
       </div>
 
+      {outOfStock.length > 0 && (
+        <div className="mb-4 flex items-center gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
+          <span>
+            Out of stock: <span className="font-medium">{outOfStock.map(i => i.name).join(', ')}</span>
+          </span>
+        </div>
+      )}
+
       <div className="mb-5 flex flex-wrap gap-1.5">
         <Chip active={filterTag === null} onClick={() => setFilterTag(null)}>
-          All · {state.items.length}
+          All · {ofKind.length}
         </Chip>
-        {state.tags.map(tag => (
-          <Chip key={tag.id} active={filterTag === tag.id} onClick={() => setFilterTag(filterTag === tag.id ? null : tag.id)}>
-            <DynamicIcon name={tag.icon} className="h-3 w-3" />
-            {tag.name} · {state.items.filter(i => i.tags.includes(tag.id)).length}
-          </Chip>
-        ))}
+        {state.tags
+          .filter(tag => ofKind.some(i => i.tags.includes(tag.id)))
+          .map(tag => (
+            <Chip
+              key={tag.id}
+              active={filterTag === tag.id}
+              onClick={() => setFilterTag(filterTag === tag.id ? null : tag.id)}
+            >
+              <DynamicIcon name={tag.icon} className="h-3 w-3" />
+              {tag.name} · {ofKind.filter(i => i.tags.includes(tag.id)).length}
+            </Chip>
+          ))}
       </div>
 
       <GlassPanel className="divide-y divide-white/5 overflow-hidden">
-        {filtered.length === 0 && (
-          <p className="py-10 text-center text-sm text-bark-500">No gear matches.</p>
+        {sorted.length === 0 && (
+          <p className="py-10 text-center text-sm text-bark-500">
+            {kind === 'gear' ? 'No gear matches.' : 'No consumables match.'}
+          </p>
         )}
-        {filtered.map(item => (
-          <div key={item.id} className="group flex items-center gap-3 px-4 py-2.5 hover:bg-white/[0.04]">
-            <Package className="h-4 w-4 shrink-0 text-bark-500" />
-            <span className="flex-1 text-sm text-bark-100">{item.name}</span>
-            {item.stock !== null && (
-              <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-bark-500">×{item.stock}</span>
-            )}
-            <div className="hidden flex-wrap justify-end gap-1 sm:flex">
-              {item.tags.map(tagId => {
-                const tag = state.tags.find(t => t.id === tagId)
-                return tag ? (
-                  <span key={tagId} className="rounded-full bg-moss-500/10 px-2 py-0.5 text-[10px] text-moss-300">
-                    {tag.name}
+        {sorted.map(item => {
+          const out = kind === 'consumable' && item.stock === 0
+          return (
+            <div
+              key={item.id}
+              className={`group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.04] ${
+                out ? 'bg-amber-500/[0.06]' : ''
+              }`}
+            >
+              {out ? (
+                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
+              ) : (
+                <Package className="h-4 w-4 shrink-0 text-bark-500" />
+              )}
+              <span className={`flex-1 text-sm ${out ? 'text-amber-100' : 'text-bark-100'}`}>
+                {item.name}
+              </span>
+
+              {kind === 'consumable' ? (
+                <div className="flex items-center gap-1">
+                  {out && (
+                    <span className="mr-1.5 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+                      Out of stock
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setStock(item, (item.stock ?? 0) - 1)}
+                    disabled={item.stock === null || item.stock === 0}
+                    className="rounded-lg border border-white/10 bg-white/5 p-1 text-bark-300 transition-colors hover:border-white/25 hover:text-bark-100 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                  </button>
+                  <span
+                    className={`w-9 text-center text-sm font-semibold tabular-nums ${
+                      out ? 'text-amber-300' : 'text-bark-100'
+                    }`}
+                  >
+                    {item.stock ?? '—'}
                   </span>
-                ) : null
-              })}
+                  <button
+                    onClick={() => setStock(item, (item.stock ?? 0) + 1)}
+                    className="rounded-lg border border-white/10 bg-white/5 p-1 text-bark-300 transition-colors hover:border-moss-400/50 hover:text-moss-200 cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                item.stock !== null && (
+                  <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-bark-500">
+                    ×{item.stock}
+                  </span>
+                )
+              )}
+
+              <div className="hidden flex-wrap justify-end gap-1 lg:flex">
+                {item.tags.map(tagId => {
+                  const tag = state.tags.find(t => t.id === tagId)
+                  return tag ? (
+                    <span key={tagId} className="rounded-full bg-moss-500/10 px-2 py-0.5 text-[10px] text-moss-300">
+                      {tag.name}
+                    </span>
+                  ) : null
+                })}
+              </div>
+              <button
+                onClick={() => setEditing(item)}
+                className="rounded p-1.5 text-bark-500 opacity-0 transition-opacity hover:bg-white/10 hover:text-bark-100 group-hover:opacity-100 cursor-pointer"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm(`Delete "${item.name}"?`)) dispatch({ type: 'deleteItem', id: item.id })
+                }}
+                className="rounded p-1.5 text-bark-500 opacity-0 transition-opacity hover:bg-red-900/30 hover:text-red-300 group-hover:opacity-100 cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <button
-              onClick={() => setEditing(item)}
-              className="rounded p-1.5 text-bark-500 opacity-0 transition-opacity hover:bg-white/10 hover:text-bark-100 group-hover:opacity-100 cursor-pointer"
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </button>
-            <button
-              onClick={() => {
-                if (confirm(`Delete "${item.name}" from your gear?`)) dispatch({ type: 'deleteItem', id: item.id })
-              }}
-              className="rounded p-1.5 text-bark-500 opacity-0 transition-opacity hover:bg-red-900/30 hover:text-red-300 group-hover:opacity-100 cursor-pointer"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ))}
+          )
+        })}
       </GlassPanel>
 
       <ItemModal
         open={creating || editing !== null}
         item={editing}
+        defaultKind={kind}
         onClose={() => {
           setCreating(false)
           setEditing(null)
@@ -130,10 +226,21 @@ function GearList() {
   )
 }
 
-function ItemModal({ open, item, onClose }: { open: boolean; item: Item | null; onClose: () => void }) {
+function ItemModal({
+  open,
+  item,
+  defaultKind,
+  onClose,
+}: {
+  open: boolean
+  item: Item | null
+  defaultKind: ItemKind
+  onClose: () => void
+}) {
   const { state, dispatch } = useStore()
   const [name, setName] = useState('')
   const [stock, setStock] = useState('')
+  const [kind, setKind] = useState<ItemKind>(defaultKind)
   const [tags, setTags] = useState<string[]>([])
   const [loadedFor, setLoadedFor] = useState<string | null>(null)
 
@@ -143,6 +250,7 @@ function ItemModal({ open, item, onClose }: { open: boolean; item: Item | null; 
     setLoadedFor(targetKey)
     setName(item?.name ?? '')
     setStock(item?.stock?.toString() ?? '')
+    setKind(item?.kind ?? defaultKind)
     setTags(item?.tags ?? [])
   }
   if (!open && loadedFor !== null) setLoadedFor(null)
@@ -151,6 +259,7 @@ function ItemModal({ open, item, onClose }: { open: boolean; item: Item | null; 
     const parsed: Item = {
       id: item?.id ?? makeId(name),
       name: name.trim(),
+      kind,
       stock: stock.trim() === '' ? null : Number(stock),
       tags,
     }
@@ -159,7 +268,7 @@ function ItemModal({ open, item, onClose }: { open: boolean; item: Item | null; 
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={item ? 'Edit gear' : 'Add gear'}>
+    <Modal open={open} onClose={onClose} title={item ? 'Edit item' : `Add ${kind === 'gear' ? 'gear' : 'consumable'}`}>
       <div className="space-y-4">
         <div className="grid grid-cols-3 gap-3">
           <div className="col-span-2">
@@ -167,8 +276,17 @@ function ItemModal({ open, item, onClose }: { open: boolean; item: Item | null; 
             <input autoFocus className={inputClass} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Headlamp" />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-bark-400">Qty owned</label>
+            <label className="mb-1.5 block text-xs font-medium text-bark-400">
+              {kind === 'consumable' ? 'In stock' : 'Qty owned'}
+            </label>
             <input className={inputClass} type="number" min="0" value={stock} onChange={e => setStock(e.target.value)} placeholder="—" />
+          </div>
+        </div>
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-bark-400">Type</label>
+          <div className="flex gap-1.5">
+            <Chip active={kind === 'gear'} onClick={() => setKind('gear')}>Gear — durable, owned</Chip>
+            <Chip active={kind === 'consumable'} onClick={() => setKind('consumable')}>Consumable — gets used up</Chip>
           </div>
         </div>
         <div>
@@ -188,7 +306,7 @@ function ItemModal({ open, item, onClose }: { open: boolean; item: Item | null; 
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={name.trim() === ''}>{item ? 'Save' : 'Add gear'}</Button>
+          <Button onClick={save} disabled={name.trim() === ''}>{item ? 'Save' : 'Add'}</Button>
         </div>
       </div>
     </Modal>
@@ -204,7 +322,7 @@ function ListManager() {
     <>
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-bark-400">
-          Lists are the layers trips are built from — each piece of gear can live on several.
+          Lists are the layers trips are built from — each item can live on several.
         </p>
         <Button onClick={() => setCreating(true)}>
           <span className="flex items-center gap-1.5">
@@ -234,7 +352,7 @@ function ListManager() {
               </button>
               <button
                 onClick={() => {
-                  if (confirm(`Delete list "${tag.name}"? Gear stays; it just loses this tag.`))
+                  if (confirm(`Delete list "${tag.name}"? Items stay; they just lose this tag.`))
                     dispatch({ type: 'deleteTag', id: tag.id })
                 }}
                 className="rounded p-1.5 text-bark-500 hover:bg-red-900/30 hover:text-red-300 cursor-pointer"
@@ -298,7 +416,7 @@ function TagModal({ open, tag, onClose }: { open: boolean; tag: Tag | null; onCl
         <div>
           <label className="mb-1.5 block text-xs font-medium text-bark-400">Icon</label>
           <div className="flex flex-wrap gap-1.5">
-            {TAG_ICONS.map(name_ => (
+            {ICON_CHOICES.map(name_ => (
               <button
                 key={name_}
                 onClick={() => setIcon(name_)}

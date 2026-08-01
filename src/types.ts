@@ -1,6 +1,10 @@
+export type ItemKind = 'gear' | 'consumable'
+
 export interface Item {
   id: string
   name: string
+  kind: ItemKind
+  /** null = untracked; for consumables, 0 = out of stock */
   stock: number | null
   tags: string[]
 }

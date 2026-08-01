@@ -1,7 +1,7 @@
 // Seed data generated from the original "Camping List - Gear" spreadsheet.
 import type { Item } from '../types'
 
-export const seedItems: Item[] = [
+export const rawSeedItems: Omit<Item, 'kind'>[] = [
   {
     "id": "tent-and-tarps",
     "name": "Tent and tarps",

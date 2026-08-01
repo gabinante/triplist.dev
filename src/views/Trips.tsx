@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
+  AlertTriangle,
   ArrowLeft,
   Calendar,
   Check,
@@ -146,6 +147,7 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
 
   const list = tripItems(trip, state.items)
   const { packed, total } = tripProgress(trip, state.items)
+  const outOfStock = list.filter(i => i.kind === 'consumable' && i.stock === 0)
 
   const groups = useMemo(() => {
     const tagSet = new Set(trip.tagIds)
@@ -232,6 +234,15 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
             </div>
           </div>
         </div>
+        {outOfStock.length > 0 && (
+          <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
+            <span>
+              Out of stock — restock before you pack:{' '}
+              <span className="font-medium">{outOfStock.map(i => i.name).join(', ')}</span>
+            </span>
+          </div>
+        )}
         <div className="mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-4">
           <Button variant="ghost" onClick={() => setAddOpen(true)}>
             <span className="flex items-center gap-1.5">
@@ -294,10 +305,16 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                       >
                         {item.name}
                       </span>
-                      {item.stock !== null && item.stock > 1 && (
-                        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-bark-500">
-                          ×{item.stock}
+                      {item.kind === 'consumable' && item.stock === 0 ? (
+                        <span className="flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+                          <AlertTriangle className="h-3 w-3" /> Out of stock
                         </span>
+                      ) : (
+                        item.stock !== null && item.stock > 1 && (
+                          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-bark-500">
+                            ×{item.stock}
+                          </span>
+                        )
                       )}
                       <button
                         onClick={e => {

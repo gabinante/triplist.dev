@@ -1,16 +1,18 @@
 import { useState } from 'react'
-import { Backpack, Map, TentTree } from 'lucide-react'
+import { Backpack, Map, Shapes, TentTree } from 'lucide-react'
 import { StoreProvider } from './store'
 import { PlanWizard } from './views/PlanWizard'
 import { TripsView } from './views/Trips'
 import { GearView } from './views/Gear'
+import { StylesView } from './views/Styles'
 
-type View = 'plan' | 'trips' | 'gear'
+type View = 'plan' | 'trips' | 'gear' | 'styles'
 
 const NAV: { id: View; label: string; icon: typeof Map }[] = [
   { id: 'plan', label: 'Plan My Trip', icon: Map },
   { id: 'trips', label: 'My Trips', icon: TentTree },
   { id: 'gear', label: 'Gear & Lists', icon: Backpack },
+  { id: 'styles', label: 'Trip Styles', icon: Shapes },
 ]
 
 export default function App() {
@@ -69,6 +71,7 @@ export default function App() {
             <TripsView selectedId={selectedTrip} onSelect={setSelectedTrip} onPlanNew={planNew} />
           )}
           {view === 'gear' && <GearView />}
+          {view === 'styles' && <StylesView />}
         </main>
       </div>
     </StoreProvider>
