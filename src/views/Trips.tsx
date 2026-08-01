@@ -21,7 +21,9 @@ import { AuthModal } from '../components/AuthModal'
 import { ShareModal } from '../components/ShareModal'
 import { fetchShareLink, respondToInvite } from '../lib/shares'
 import type { Invite, ShareLinkInfo } from '../lib/shares'
-import { Inbox, Share2 } from 'lucide-react'
+import { Inbox, Printer, Share2 } from 'lucide-react'
+import { PrintSheet } from '../components/PrintSheet'
+import type { PrintSheetData } from '../components/PrintSheet'
 
 const GROUP_ORDER = [
   'toiletries',
@@ -359,6 +361,7 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
   const [editTags, setEditTags] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
+  const [printSheet, setPrintSheet] = useState<PrintSheetData | null>(null)
   const authAvailable = useAuthAvailable()
   const { data: session } = useSession()
 
@@ -492,6 +495,39 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
               </span>
             </Button>
           )}
+          <Button
+            variant="ghost"
+            onClick={() =>
+              setPrintSheet({
+                title: trip.name,
+                subtitle: [
+                  trip.date &&
+                    new Date(trip.date + 'T00:00').toLocaleDateString(undefined, {
+                      weekday: 'short',
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    }),
+                  `${total} items`,
+                  `${packed} packed`,
+                ]
+                  .filter(Boolean)
+                  .join(' · '),
+                groups: groups.map(([groupTag, items]) => ({
+                  heading: state.tags.find(t => t.id === groupTag)?.name ?? 'Other',
+                  items: items.map(i => ({
+                    name: i.name,
+                    checked: !!trip.packed[i.id],
+                    qty: i.stock,
+                  })),
+                })),
+              })
+            }
+          >
+            <span className="flex items-center gap-1.5">
+              <Printer className="h-4 w-4" /> Print
+            </span>
+          </Button>
         </div>
       </GlassPanel>
 
@@ -579,6 +615,7 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
         })}
       />
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode="signup" />
+      <PrintSheet sheet={printSheet} onDone={() => setPrintSheet(null)} />
     </div>
   )
 }
@@ -590,6 +627,16 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
   const [newName, setNewName] = useState('')
   const [newKind, setNewKind] = useState<ItemKind>('gear')
   const [newTags, setNewTags] = useState<string[]>([])
+  const [newListName, setNewListName] = useState<string | null>(null)
+
+  const createList = () => {
+    const name = newListName?.trim()
+    if (!name) return
+    const tag = { id: makeId(name), name, icon: 'Package' }
+    dispatch({ type: 'addTag', tag })
+    setNewTags(tags => [...tags, tag.id])
+    setNewListName(null)
+  }
 
   const currentIds = new Set(tripItems(trip, state.items).map(i => i.id))
   const candidates = state.items.filter(
@@ -676,6 +723,24 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
                   {tag.name}
                 </Chip>
               ))}
+              {newListName === null ? (
+                <Chip onClick={() => setNewListName('')} className="border-dashed">
+                  <Plus className="h-3 w-3" /> New list
+                </Chip>
+              ) : (
+                <input
+                  autoFocus
+                  className="w-32 rounded-full border border-moss-400/50 bg-white/5 px-3 py-1 text-xs text-bark-50 outline-none placeholder-bark-500"
+                  placeholder="List name…"
+                  value={newListName}
+                  onChange={e => setNewListName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') createList()
+                    if (e.key === 'Escape') setNewListName(null)
+                  }}
+                  onBlur={() => (newListName.trim() ? createList() : setNewListName(null))}
+                />
+              )}
             </div>
             <p className="mt-1.5 text-[11px] text-bark-500">
               Pick as many as fit — the item joins those lists for future trips too. None picked? It still

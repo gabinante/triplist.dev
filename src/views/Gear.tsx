@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { AlertTriangle, Minus, Package, Pencil, Plus, Search, Share2, Trash2 } from 'lucide-react'
+import { AlertTriangle, Minus, Package, Pencil, Plus, Printer, Search, Share2, Trash2 } from 'lucide-react'
+import { PrintSheet } from '../components/PrintSheet'
+import type { PrintSheetData } from '../components/PrintSheet'
 import { makeId, useStore } from '../store'
 import type { Item, ItemKind, Tag } from '../types'
 import { Button, Chip, DynamicIcon, GlassPanel, ICON_CHOICES, Modal, inputClass } from '../components/ui'
@@ -326,6 +328,7 @@ function ListManager() {
   const [creating, setCreating] = useState(false)
   const [sharing, setSharing] = useState<Tag | null>(null)
   const [authOpen, setAuthOpen] = useState(false)
+  const [printSheet, setPrintSheet] = useState<PrintSheetData | null>(null)
   const authAvailable = useAuthAvailable()
   const { data: session } = useSession()
 
@@ -362,6 +365,26 @@ function ListManager() {
                   {count} items{tag.description ? ` · ${tag.description}` : ''}
                 </p>
               </div>
+              <button
+                onClick={() =>
+                  setPrintSheet({
+                    title: tag.name,
+                    subtitle: [tag.description, `${count} items`].filter(Boolean).join(' · '),
+                    groups: [
+                      {
+                        heading: tag.name,
+                        items: state.items
+                          .filter(i => i.tags.includes(tag.id))
+                          .map(i => ({ name: i.name, qty: i.stock })),
+                      },
+                    ],
+                  })
+                }
+                className="rounded p-1.5 text-bark-500 hover:bg-white/10 hover:text-bark-100 cursor-pointer"
+                title="Print / save as PDF"
+              >
+                <Printer className="h-4 w-4" />
+              </button>
               {authAvailable && (
                 <button
                   onClick={() => (session?.user ? setSharing(tag) : setAuthOpen(true))}
@@ -412,6 +435,7 @@ function ListManager() {
         />
       )}
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode="signup" />
+      <PrintSheet sheet={printSheet} onDone={() => setPrintSheet(null)} />
     </>
   )
 }

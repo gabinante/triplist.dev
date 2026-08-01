@@ -108,3 +108,93 @@ body {
 input[type='date']::-webkit-calendar-picker-indicator {
   filter: invert(0.7);
 }
+
+/* Print sheet: hidden on screen; in print it becomes the whole document */
+.print-sheet {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 1.6cm;
+  }
+  #root,
+  .ambient {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+  .print-sheet {
+    display: block;
+    color: #111;
+    background: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .print-sheet h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin: 0 0 2px;
+  }
+  .print-sheet .print-subtitle {
+    color: #555;
+    margin: 0 0 14px;
+  }
+  .print-sheet header {
+    border-bottom: 2px solid #111;
+    padding-bottom: 8px;
+    margin-bottom: 14px;
+  }
+  .print-sheet section {
+    break-inside: avoid;
+    margin-bottom: 12px;
+  }
+  .print-sheet h2 {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0 0 6px;
+    color: #333;
+  }
+  .print-sheet ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    columns: 2;
+    column-gap: 28px;
+  }
+  .print-sheet li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 2.5px 0;
+    break-inside: avoid;
+  }
+  .print-box {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    border: 1.5px solid #444;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .print-box-checked {
+    background: #444;
+  }
+  .print-name {
+    flex: 1;
+  }
+  .print-qty {
+    color: #777;
+  }
+  .print-sheet footer {
+    margin-top: 16px;
+    padding-top: 8px;
+    border-top: 1px solid #ccc;
+    color: #999;
+    font-size: 10px;
+  }
+}
