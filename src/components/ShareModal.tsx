@@ -3,10 +3,12 @@ import { Check, Send } from 'lucide-react'
 import { tripItems, useStore } from '../store'
 import type { Trip } from '../types'
 import { shareTrip } from '../lib/shares'
-import { Button, Modal, inputClass } from './ui'
+import { useFriends } from '../lib/friends'
+import { Button, Chip, Modal, inputClass } from './ui'
 
 export function ShareModal({ trip, open, onClose }: { trip: Trip; open: boolean; onClose: () => void }) {
   const { state } = useStore()
+  const { friends } = useFriends()
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
@@ -60,6 +62,18 @@ export function ShareModal({ trip, open, onClose }: { trip: Trip; open: boolean;
             They'll get their own copy of this packing list — {tripItems(trip, state.items).length} items — to
             accept or decline.
           </p>
+          {friends.length > 0 && (
+            <div>
+              <label className="mb-1.5 block text-xs font-medium text-bark-400">Your people</label>
+              <div className="flex flex-wrap gap-1.5">
+                {friends.map(f => (
+                  <Chip key={f.id} active={email === f.email} onClick={() => setEmail(f.email)}>
+                    {f.name || f.email}
+                  </Chip>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-bark-400">Their email</label>
             <input

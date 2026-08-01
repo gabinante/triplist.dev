@@ -1,6 +1,7 @@
 import crypto from 'node:crypto'
 import express from 'express'
 import { emailEnabled, escapeHtml as esc, sendEmail } from './email.mjs'
+import { emailOptedOut } from './friends.mjs'
 
 const APP_URL = process.env.BETTER_AUTH_URL ?? 'https://triplist.dev'
 
@@ -66,7 +67,7 @@ export async function mountShares(app, { auth, pool }) {
     )
 
     let emailed = false
-    if (emailEnabled) {
+    if (emailEnabled && !(await emailOptedOut(pool, recipient))) {
       const ownerName = session.user.name || session.user.email
       const trimmed = message?.slice(0, 500)
       emailed = await sendEmail({

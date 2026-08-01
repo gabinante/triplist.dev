@@ -22,8 +22,37 @@ export const auth = authEnabled
         'http://localhost:8080',
         'http://localhost:5199',
       ],
+      user: {
+        additionalFields: {
+          // Notification preference: branded emails for trip/friend invites.
+          inviteEmails: { type: 'boolean', defaultValue: true, input: true },
+        },
+        changeEmail: {
+          enabled: true,
+          async sendChangeEmailVerification({ user, newEmail, url }) {
+            await sendEmail({
+              to: user.email,
+              subject: 'Confirm your TripList email change',
+              heading: 'Confirm your new email',
+              bodyHtml: `You asked to change your TripList email from <strong style="color:#c8d6ac">${esc(user.email)}</strong> to <strong style="color:#c8d6ac">${esc(newEmail)}</strong>. Confirm from this (current) address to approve it.`,
+              cta: { label: 'Approve email change', url },
+              footnote: "If you didn't request this, you can ignore this email and nothing will change.",
+            })
+          },
+        },
+      },
       emailAndPassword: {
         enabled: true,
+        async sendResetPassword({ user, url }) {
+          await sendEmail({
+            to: user.email,
+            subject: 'Reset your TripList password',
+            heading: 'Reset your password',
+            bodyHtml: 'Click below to choose a new password for your TripList account. This link expires in an hour.',
+            cta: { label: 'Reset password', url },
+            footnote: "If you didn't request a reset, you can safely ignore this email.",
+          })
+        },
       },
       emailVerification: {
         sendOnSignUp: true,

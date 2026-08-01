@@ -2,33 +2,40 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { LogIn, TentTree, UserPlus, X } from 'lucide-react'
-import { signIn, signUp } from '../lib/auth-client'
+import { authClient, signIn, signUp } from '../lib/auth-client'
 import { useStore } from '../store'
 import { Button, inputClass } from './ui'
 
-/** Full-window sign-in / sign-up screen with its own ambient backdrop. */
+type AuthMode = 'signin' | 'signup' | 'forgot' | 'reset'
+
+/** Full-window sign-in / sign-up / password-reset screen. */
 export function AuthModal({
   open,
   onClose,
   initialMode = 'signin',
   prefillEmail,
+  resetToken,
 }: {
   open: boolean
   onClose: () => void
-  initialMode?: 'signin' | 'signup'
+  initialMode?: AuthMode
   prefillEmail?: string
+  resetToken?: string | null
 }) {
   const { state } = useStore()
-  const [mode, setMode] = useState<'signin' | 'signup'>(initialMode)
+  const [mode, setMode] = useState<AuthMode>(initialMode)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     if (open) {
       setMode(initialMode)
+      setNotice(null)
+      setError(null)
       if (prefillEmail) setEmail(prefillEmail)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -39,19 +46,59 @@ export function AuthModal({
   const submit = async () => {
     setBusy(true)
     setError(null)
-    const result =
-      mode === 'signin'
-        ? await signIn.email({ email, password })
-        : await signUp.email({ email, password, name: name.trim() || email.split('@')[0] })
-    setBusy(false)
-    if (result.error) {
-      setError(result.error.message ?? 'Something went wrong — try again.')
-    } else {
+    setNotice(null)
+    try {
+      if (mode === 'forgot') {
+        const r = await authClient.requestPasswordReset({ email, redirectTo: '/reset' })
+        if (r.error) throw new Error(r.error.message)
+        setNotice(`If an account exists for ${email}, a reset link is on its way.`)
+        return
+      }
+      if (mode === 'reset') {
+        const r = await authClient.resetPassword({ newPassword: password, token: resetToken ?? '' })
+        if (r.error) throw new Error(r.error.message)
+        setNotice('Password updated — sign in with your new password.')
+        setPassword('')
+        setMode('signin')
+        return
+      }
+      const result =
+        mode === 'signin'
+          ? await signIn.email({ email, password })
+          : await signUp.email({ email, password, name: name.trim() || email.split('@')[0] })
+      if (result.error) throw new Error(result.error.message ?? undefined)
       onClose()
+    } catch (err) {
+      setError(err instanceof Error && err.message ? err.message : 'Something went wrong — try again.')
+    } finally {
+      setBusy(false)
     }
   }
 
-  const canSubmit = email.includes('@') && password.length >= 8 && !busy
+  const canSubmit =
+    !busy &&
+    (mode === 'forgot'
+      ? email.includes('@')
+      : mode === 'reset'
+        ? password.length >= 8
+        : email.includes('@') && password.length >= 8)
+
+  const heading =
+    mode === 'signin' ? 'Welcome back'
+    : mode === 'signup' ? 'Create your account'
+    : mode === 'forgot' ? 'Reset your password'
+    : 'Choose a new password'
+
+  const subtext =
+    mode === 'signin'
+      ? 'Sign in to get your lists and trips on every device. Anything you made in this browser comes with you.'
+      : mode === 'signup'
+        ? tripCount > 0
+          ? `Everything you've built here — ${tripCount === 1 ? 'your trip' : `all ${tripCount} trips`}, gear, and lists — will be saved to your new account.`
+          : 'An account keeps your lists and trips synced across devices — and unlocks sharing.'
+        : mode === 'forgot'
+          ? "Enter your account email and we'll send you a reset link."
+          : 'Almost done — pick a new password for your account.'
 
   // Portal to <body>: ancestors with backdrop-filter (the sidebar) would
   // otherwise trap this fixed overlay in their containing block.
@@ -90,16 +137,8 @@ export function AuthModal({
               </div>
 
               <div className="glass rounded-3xl p-8">
-                <h1 className="text-2xl font-bold text-bark-50">
-                  {mode === 'signin' ? 'Welcome back' : 'Create your account'}
-                </h1>
-                <p className="mt-2 mb-6 text-sm leading-relaxed text-bark-400">
-                  {mode === 'signin'
-                    ? 'Sign in to get your lists and trips on every device. Anything you made in this browser comes with you.'
-                    : tripCount > 0
-                      ? `Everything you've built here — ${tripCount === 1 ? 'your trip' : `all ${tripCount} trips`}, gear, and lists — will be saved to your new account.`
-                      : 'An account keeps your lists and trips synced across devices — and unlocks sharing.'}
-                </p>
+                <h1 className="text-2xl font-bold text-bark-50">{heading}</h1>
+                <p className="mt-2 mb-6 text-sm leading-relaxed text-bark-400">{subtext}</p>
 
                 <div className="space-y-4">
                   {mode === 'signup' && (
@@ -113,28 +152,52 @@ export function AuthModal({
                       />
                     </div>
                   )}
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-bark-400">Email</label>
-                    <input
-                      autoFocus
-                      type="email"
-                      className={inputClass}
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      placeholder="you@example.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-xs font-medium text-bark-400">Password</label>
-                    <input
-                      type="password"
-                      className={inputClass}
-                      value={password}
-                      onChange={e => setPassword(e.target.value)}
-                      placeholder="At least 8 characters"
-                      onKeyDown={e => e.key === 'Enter' && canSubmit && submit()}
-                    />
-                  </div>
+                  {mode !== 'reset' && (
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-bark-400">Email</label>
+                      <input
+                        autoFocus
+                        type="email"
+                        className={inputClass}
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        placeholder="you@example.com"
+                        onKeyDown={e => e.key === 'Enter' && mode === 'forgot' && canSubmit && submit()}
+                      />
+                    </div>
+                  )}
+                  {mode !== 'forgot' && (
+                    <div>
+                      <label className="mb-1.5 block text-xs font-medium text-bark-400">
+                        {mode === 'reset' ? 'New password' : 'Password'}
+                      </label>
+                      <input
+                        type="password"
+                        className={inputClass}
+                        value={password}
+                        onChange={e => setPassword(e.target.value)}
+                        placeholder="At least 8 characters"
+                        onKeyDown={e => e.key === 'Enter' && canSubmit && submit()}
+                      />
+                      {mode === 'signin' && (
+                        <button
+                          onClick={() => {
+                            setMode('forgot')
+                            setError(null)
+                            setNotice(null)
+                          }}
+                          className="mt-1.5 text-xs text-bark-500 underline-offset-2 hover:text-moss-300 hover:underline cursor-pointer"
+                        >
+                          Forgot your password?
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {notice && (
+                    <p className="rounded-xl border border-moss-400/30 bg-moss-500/10 px-3 py-2 text-sm text-moss-300">
+                      {notice}
+                    </p>
+                  )}
                   {error && (
                     <p className="rounded-xl border border-red-500/30 bg-red-900/20 px-3 py-2 text-sm text-red-300">
                       {error}
@@ -146,25 +209,32 @@ export function AuthModal({
                         <>
                           <LogIn className="h-4 w-4" /> {busy ? 'Signing in…' : 'Sign in'}
                         </>
-                      ) : (
+                      ) : mode === 'signup' ? (
                         <>
                           <UserPlus className="h-4 w-4" /> {busy ? 'Creating…' : 'Create account'}
                         </>
+                      ) : mode === 'forgot' ? (
+                        <>{busy ? 'Sending…' : 'Send reset link'}</>
+                      ) : (
+                        <>{busy ? 'Saving…' : 'Set new password'}</>
                       )}
                     </span>
                   </Button>
                 </div>
               </div>
 
-              <button
-                onClick={() => {
-                  setMode(mode === 'signin' ? 'signup' : 'signin')
-                  setError(null)
-                }}
-                className="mx-auto mt-6 block text-sm text-bark-400 underline-offset-2 transition-colors hover:text-moss-300 hover:underline cursor-pointer"
-              >
-                {mode === 'signin' ? 'New here? Create an account' : 'Already have an account? Sign in'}
-              </button>
+              {mode !== 'reset' && (
+                <button
+                  onClick={() => {
+                    setMode(mode === 'signin' || mode === 'forgot' ? 'signup' : 'signin')
+                    setError(null)
+                    setNotice(null)
+                  }}
+                  className="mx-auto mt-6 block text-sm text-bark-400 underline-offset-2 transition-colors hover:text-moss-300 hover:underline cursor-pointer"
+                >
+                  {mode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create an account'}
+                </button>
+              )}
             </motion.div>
           </div>
         </motion.div>

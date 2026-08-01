@@ -1,23 +1,26 @@
 import { useEffect, useState } from 'react'
-import { Backpack, Map, Shapes, TentTree } from 'lucide-react'
+import { Backpack, Check, HeartHandshake, Map, Shapes, TentTree } from 'lucide-react'
 import { StoreProvider } from './store'
 import { PlanWizard } from './views/PlanWizard'
 import { TripsView } from './views/Trips'
 import { GearView } from './views/Gear'
 import { StylesView } from './views/Styles'
+import { FriendsView } from './views/Friends'
 import { AccountSection } from './components/Account'
+import { AuthModal } from './components/AuthModal'
 import { claimShare, useInbox } from './lib/shares'
+import { useFriends } from './lib/friends'
 import { useSession } from './lib/auth-client'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check } from 'lucide-react'
 
-type View = 'plan' | 'trips' | 'gear' | 'styles'
+type View = 'plan' | 'trips' | 'gear' | 'styles' | 'friends'
 
 const NAV: { id: View; label: string; icon: typeof Map }[] = [
   { id: 'plan', label: 'Plan My Trip', icon: Map },
   { id: 'trips', label: 'My Trips', icon: TentTree },
   { id: 'gear', label: 'Gear & Lists', icon: Backpack },
   { id: 'styles', label: 'Trip Styles', icon: Shapes },
+  { id: 'friends', label: 'Friends & Family', icon: HeartHandshake },
 ]
 
 export default function App() {
@@ -26,22 +29,30 @@ export default function App() {
   const [wizardKey, setWizardKey] = useState(0)
   const [shareLinkId, setShareLinkId] = useState<string | null>(null)
   const [verifiedToast, setVerifiedToast] = useState(false)
+  const [resetToken, setResetToken] = useState<string | null>(null)
   const { invites, refresh: refreshInbox } = useInbox()
+  const friends = useFriends()
   const { data: session } = useSession()
 
-  // Invite-email links land on /?share=… — go straight to My Trips.
-  // Email-confirmation links land on /?verified=1.
+  // Email links land here: /?share=… (trip invites), /?verified=1 (email
+  // confirmation), /?friends=1 (friend requests), /reset?token=… (password).
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+    if (window.location.pathname === '/reset' && params.has('token')) {
+      setResetToken(params.get('token'))
+      window.history.replaceState(null, '', '/')
+      return
+    }
     if (params.has('share')) {
       setShareLinkId(params.get('share'))
       setView('trips')
     }
+    if (params.get('friends') === '1') setView('friends')
     if (params.get('verified') === '1') {
       setVerifiedToast(true)
       setTimeout(() => setVerifiedToast(false), 5000)
     }
-    if (params.has('share') || params.has('verified')) {
+    if (params.has('share') || params.has('verified') || params.has('friends')) {
       window.history.replaceState(null, '', window.location.pathname)
     }
   }, [])
@@ -92,9 +103,10 @@ export default function App() {
               >
                 <span className="relative">
                   <Icon className="h-[18px] w-[18px] shrink-0" />
-                  {id === 'trips' && invites.length > 0 && (
+                  {((id === 'trips' && invites.length > 0) ||
+                    (id === 'friends' && friends.incoming.length > 0)) && (
                     <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-moss-400 px-1 text-[10px] font-bold text-bark-950">
-                      {invites.length}
+                      {id === 'trips' ? invites.length : friends.incoming.length}
                     </span>
                   )}
                 </span>
@@ -122,7 +134,14 @@ export default function App() {
           )}
           {view === 'gear' && <GearView />}
           {view === 'styles' && <StylesView />}
+          {view === 'friends' && <FriendsView data={friends} onChange={friends.refresh} />}
         </main>
+        <AuthModal
+          open={resetToken !== null}
+          onClose={() => setResetToken(null)}
+          initialMode="reset"
+          resetToken={resetToken}
+        />
         <AnimatePresence>
           {verifiedToast && (
             <motion.div

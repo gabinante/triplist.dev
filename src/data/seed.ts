@@ -32,11 +32,16 @@ export const CONSUMABLE_IDS = new Set([
  * Items that stay on Base when camping gear moves to Camp Basics: anything
  * toiletries-tagged, plus these genuinely-universal ids.
  */
-const UNIVERSAL_BASE_IDS = new Set(['sunscreen', 'neosporin-medications-allergy', 'power-bank-solar-panel'])
+const UNIVERSAL_BASE_IDS = new Set(['sunscreen', 'neosporin-medications-allergy'])
+
+/** Items that must never ride on Base, whatever their other tags say. */
+export const BASE_EXCLUDED_IDS = new Set(['collapseable-water-jug', 'power-bank-solar-panel'])
 
 /** Move camping-specific gear off the auto-applied Base list onto Camp Basics. */
 export function rehomeBaseTags(tags: string[], id: string): string[] {
   if (!tags.includes('always')) return tags
+  if (BASE_EXCLUDED_IDS.has(id))
+    return [...tags.filter(t => t !== 'always' && t !== 'camping'), 'camping']
   if (tags.includes('toiletries') || UNIVERSAL_BASE_IDS.has(id)) return tags
   return [...tags.filter(t => t !== 'always'), 'camping']
 }
@@ -52,6 +57,24 @@ export const CLOTHING_ITEMS: Item[] = [
   { id: 'phone-charger', name: 'Phone Charger', kind: 'gear', stock: null, tags: ['always'] },
 ]
 
+/** Starter items for lists that shipped empty (seed v5). */
+export const STARTER_LIST_ITEMS: Item[] = [
+  { id: 'changes-of-clothes', name: 'Changes of Clothes (one per day)', kind: 'gear', stock: null, tags: ['always'] },
+  { id: 'computer', name: 'Computer', kind: 'gear', stock: null, tags: ['lan'] },
+  { id: 'mousepad', name: 'Mousepad', kind: 'gear', stock: null, tags: ['lan'] },
+  { id: 'mouse', name: 'Mouse', kind: 'gear', stock: null, tags: ['lan'] },
+  { id: 'laptop', name: 'Laptop', kind: 'gear', stock: null, tags: ['business'] },
+  { id: 'laptop-charger', name: 'Laptop Charger', kind: 'gear', stock: null, tags: ['business', 'lan'] },
+  { id: 'business-casual-outfits', name: 'Business Casual Outfits', kind: 'gear', stock: null, tags: ['business'] },
+  { id: 'day-bag', name: 'Day Bag', kind: 'gear', stock: null, tags: ['hotel'] },
+  { id: 'dopp-kit', name: 'Dopp Kit', kind: 'gear', stock: null, tags: ['hotel'] },
+  { id: 'passport-id', name: 'Passport / ID', kind: 'gear', stock: null, tags: ['all-inclusive'] },
+  { id: 'swimsuit', name: 'Swimsuit', kind: 'gear', stock: null, tags: ['all-inclusive', 'water'] },
+  { id: 'sea-sickness-meds', name: 'Sea-Sickness Meds', kind: 'consumable', stock: null, tags: ['all-inclusive'] },
+  { id: 'shared-snacks', name: 'Shared Snacks', kind: 'consumable', stock: null, tags: ['group'] },
+  { id: 'serving-utensils', name: 'Serving Utensils', kind: 'gear', stock: null, tags: ['group', 'kitchen'] },
+]
+
 export const seedItems: Item[] = [
   ...rawSeedItems.map(i => ({
     ...i,
@@ -59,6 +82,7 @@ export const seedItems: Item[] = [
     tags: rehomeBaseTags(i.tags, i.id),
   })),
   ...CLOTHING_ITEMS,
+  ...STARTER_LIST_ITEMS,
 ]
 
 export const seedTags: Tag[] = [
@@ -83,7 +107,7 @@ export const seedTags: Tag[] = [
 ]
 
 /** Bump when seed tags/cards are added so existing saves pick them up. */
-export const SEED_VERSION = 4
+export const SEED_VERSION = 5
 
 export const wizardSteps: WizardStep[] = [
   {

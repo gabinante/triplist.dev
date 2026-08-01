@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { LogIn, LogOut } from 'lucide-react'
+import { LogIn, LogOut, Settings } from 'lucide-react'
 import { signOut, useAuthAvailable, useSession } from '../lib/auth-client'
 import type { State } from '../store'
 import { mergeStates, useStore } from '../store'
 import { AuthModal } from './AuthModal'
+import { PreferencesModal } from './Preferences'
 
 async function putState(state: State) {
   await fetch('/api/state', {
@@ -23,6 +24,7 @@ export function AccountSection() {
   const { state, dispatch } = useStore()
   const authAvailable = useAuthAvailable()
   const [modalOpen, setModalOpen] = useState(false)
+  const [prefsOpen, setPrefsOpen] = useState(false)
   const syncedFor = useRef<string | null>(null)
   const stateRef = useRef(state)
   stateRef.current = state
@@ -94,6 +96,13 @@ export function AccountSection() {
           <p className="truncate text-[11px] text-bark-500">{session.user.email}</p>
         </div>
         <button
+          onClick={() => setPrefsOpen(true)}
+          className="rounded-lg p-1.5 text-bark-500 hover:bg-white/10 hover:text-bark-100 cursor-pointer"
+          title="Preferences"
+        >
+          <Settings className="h-4 w-4" />
+        </button>
+        <button
           onClick={() => signOut()}
           className="rounded-lg p-1.5 text-bark-500 hover:bg-white/10 hover:text-bark-100 cursor-pointer"
           title="Sign out"
@@ -101,6 +110,7 @@ export function AccountSection() {
           <LogOut className="h-4 w-4" />
         </button>
       </div>
+      <PreferencesModal open={prefsOpen} onClose={() => setPrefsOpen(false)} />
     </div>
   )
 }

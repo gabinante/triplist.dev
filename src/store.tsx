@@ -2,9 +2,11 @@ import { createContext, useContext, useEffect, useReducer } from 'react'
 import type { ReactNode } from 'react'
 import type { Item, Tag, Trip, WizardStep } from './types'
 import {
+  BASE_EXCLUDED_IDS,
   CLOTHING_ITEMS,
   CONSUMABLE_IDS,
   SEED_VERSION,
+  STARTER_LIST_ITEMS,
   rehomeBaseTags,
   seedItems,
   seedTags,
@@ -103,6 +105,14 @@ export function normalizeState(state: State): State {
               c.id === 'group' && !c.tags.includes('group') ? { ...c, tags: [...c.tags, 'group'] } : c,
             ),
           }))
+        }
+        if (from < 5) {
+          // v5: starter items for lists that shipped empty, and evict the
+          // water jug / solar panel from Base (they're camp gear)
+          state.items = [
+            ...state.items.map(i => (BASE_EXCLUDED_IDS.has(i.id) ? { ...i, tags: rehomeBaseTags(i.tags, i.id) } : i)),
+            ...STARTER_LIST_ITEMS.filter(s => !state.items.some(i => i.id === s.id)),
+          ]
         }
         state.seedVersion = SEED_VERSION
       }

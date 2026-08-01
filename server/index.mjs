@@ -4,6 +4,7 @@ import express from 'express'
 import { toNodeHandler } from 'better-auth/node'
 import { auth, authEnabled, pool } from './auth.mjs'
 import { mountShares } from './shares.mjs'
+import { mountFriends } from './friends.mjs'
 
 const dist = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist')
 const port = Number(process.env.PORT ?? 8080)
@@ -56,6 +57,7 @@ if (authEnabled) {
   })
 
   await mountShares(app, { auth, pool })
+  await mountFriends(app, { auth, pool })
 }
 
 app.get('/api/health', async (_req, res) => {

@@ -1,9 +1,16 @@
 import { useEffect, useState } from 'react'
 import { createAuthClient } from 'better-auth/react'
+import { inferAdditionalFields } from 'better-auth/client/plugins'
 
 // Same-origin in production; the Vite dev server proxies /api to the
 // local Express server when one is running.
-export const authClient = createAuthClient()
+export const authClient = createAuthClient({
+  plugins: [
+    inferAdditionalFields({
+      user: { inviteEmails: { type: 'boolean', required: false } },
+    }),
+  ],
+})
 
 export const { useSession, signIn, signUp, signOut } = authClient
 
