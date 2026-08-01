@@ -16,6 +16,8 @@ import {
 import { tripItems, tripProgress, useStore } from '../store'
 import type { Item, Trip } from '../types'
 import { Button, Chip, DynamicIcon, GlassPanel, Modal, ProgressRing } from '../components/ui'
+import { useAuthAvailable, useSession } from '../lib/auth-client'
+import { AuthModal } from '../components/AuthModal'
 
 const GROUP_ORDER = [
   'toiletries',
@@ -52,6 +54,28 @@ export function TripsView({
   return <TripGrid onSelect={onSelect} onPlanNew={onPlanNew} />
 }
 
+function SaveTripsNudge() {
+  const authAvailable = useAuthAvailable()
+  const { data: session, isPending } = useSession()
+  const { state } = useStore()
+  const [authOpen, setAuthOpen] = useState(false)
+
+  if (!authAvailable || isPending || session?.user || state.trips.length === 0) return null
+
+  return (
+    <>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-moss-400/25 bg-moss-500/10 px-4 py-3">
+        <p className="text-sm text-moss-200">
+          <span className="font-semibold">These trips live only in this browser.</span>{' '}
+          <span className="text-moss-300/90">Sign up or log in to save them to your profile.</span>
+        </p>
+        <Button onClick={() => setAuthOpen(true)}>Save my trips</Button>
+      </div>
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode="signup" />
+    </>
+  )
+}
+
 function TripGrid({ onSelect, onPlanNew }: { onSelect: (id: string) => void; onPlanNew: () => void }) {
   const { state, dispatch } = useStore()
 
@@ -80,6 +104,7 @@ function TripGrid({ onSelect, onPlanNew }: { onSelect: (id: string) => void; onP
           </span>
         </Button>
       </div>
+      <SaveTripsNudge />
       <div className="grid gap-4 sm:grid-cols-2">
         {state.trips.map((trip, i) => {
           const { packed, total } = tripProgress(trip, state.items)

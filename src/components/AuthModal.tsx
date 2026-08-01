@@ -1,10 +1,24 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { LogIn, UserPlus } from 'lucide-react'
 import { signIn, signUp } from '../lib/auth-client'
+import { useStore } from '../store'
 import { Button, Modal, inputClass } from './ui'
 
-export function AuthModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+export function AuthModal({
+  open,
+  onClose,
+  initialMode = 'signin',
+}: {
+  open: boolean
+  onClose: () => void
+  initialMode?: 'signin' | 'signup'
+}) {
+  const { state } = useStore()
+  const [mode, setMode] = useState<'signin' | 'signup'>(initialMode)
+  useEffect(() => {
+    if (open) setMode(initialMode)
+  }, [open, initialMode])
+  const tripCount = state.trips.length
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -33,8 +47,10 @@ export function AuthModal({ open, onClose }: { open: boolean; onClose: () => voi
       <div className="space-y-4">
         <p className="text-sm text-bark-400">
           {mode === 'signin'
-            ? 'Sign in to get your lists and trips on every device.'
-            : 'An account keeps your lists and trips synced across devices — and unlocks sharing, soon.'}
+            ? 'Sign in to get your lists and trips on every device. Anything you made in this browser comes with you.'
+            : tripCount > 0
+              ? `Everything you've built here — ${tripCount === 1 ? 'your trip' : `all ${tripCount} trips`}, gear, and lists — will be saved to your new account.`
+              : 'An account keeps your lists and trips synced across devices — and unlocks sharing, soon.'}
         </p>
         {mode === 'signup' && (
           <div>

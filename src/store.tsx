@@ -99,6 +99,31 @@ export function normalizeState(state: State): State {
       return state
 }
 
+function unionById<T extends { id: string }>(primary: T[], secondary: T[]): T[] {
+  const seen = new Set(primary.map(x => x.id))
+  return [...primary, ...secondary.filter(x => !seen.has(x.id))]
+}
+
+/**
+ * Merge the account's server copy with whatever this browser accumulated as a
+ * guest. Server wins on conflicting ids; local-only trips, gear, lists, and
+ * wizard cards are kept — guest work must survive signing in.
+ */
+export function mergeStates(server: State, local: State): State {
+  const wizard = server.wizard.map(step => {
+    const localStep = local.wizard.find(s => s.id === step.id)
+    return localStep ? { ...step, cards: unionById(step.cards, localStep.cards) } : step
+  })
+  const localOnlySteps = local.wizard.filter(s => !server.wizard.some(x => x.id === s.id))
+  return normalizeState({
+    items: unionById(server.items, local.items),
+    tags: unionById(server.tags, local.tags),
+    trips: unionById(server.trips, local.trips),
+    wizard: [...wizard, ...localOnlySteps],
+    seedVersion: Math.max(server.seedVersion ?? 1, local.seedVersion ?? 1),
+  })
+}
+
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'addItem':

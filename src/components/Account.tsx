@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { LogIn, LogOut } from 'lucide-react'
-import { signOut, useSession } from '../lib/auth-client'
+import { signOut, useAuthAvailable, useSession } from '../lib/auth-client'
 import type { State } from '../store'
-import { useStore } from '../store'
+import { mergeStates, useStore } from '../store'
 import { AuthModal } from './AuthModal'
 
 async function putState(state: State) {
@@ -21,22 +21,17 @@ async function putState(state: State) {
 export function AccountSection() {
   const { data: session } = useSession()
   const { state, dispatch } = useStore()
-  const [authAvailable, setAuthAvailable] = useState(false)
+  const authAvailable = useAuthAvailable()
   const [modalOpen, setModalOpen] = useState(false)
   const syncedFor = useRef<string | null>(null)
   const stateRef = useRef(state)
   stateRef.current = state
 
-  useEffect(() => {
-    fetch('/api/health')
-      .then(r => r.json())
-      .then(h => setAuthAvailable(Boolean(h.auth)))
-      .catch(() => setAuthAvailable(false))
-  }, [])
-
   const userId = session?.user?.id ?? null
 
-  // On sign-in: pull the server doc if it exists, otherwise upload local state.
+  // On sign-in: merge the server copy with local guest work (local-only trips,
+  // gear, lists, and cards survive; server wins on conflicts). On first signup
+  // there is no server doc yet, so the local state seeds the account.
   useEffect(() => {
     if (!userId) {
       syncedFor.current = null
@@ -49,8 +44,9 @@ export function AccountSection() {
         if (!res.ok || cancelled) return
         const { doc } = await res.json()
         if (cancelled) return
-        if (doc) dispatch({ type: 'hydrate', state: doc })
-        else await putState(stateRef.current)
+        const next = doc ? mergeStates(doc, stateRef.current) : stateRef.current
+        if (doc) dispatch({ type: 'hydrate', state: next })
+        await putState(next)
         syncedFor.current = userId
       } catch {
         // offline or server hiccup — localStorage still has everything
