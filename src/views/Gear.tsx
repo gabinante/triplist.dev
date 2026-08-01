@@ -14,7 +14,7 @@ export function GearView() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-bark-50">Gear & Lists</h1>
         <div className="glass flex rounded-xl p-1">
           {(
@@ -41,6 +41,10 @@ export function GearView() {
           ))}
         </div>
       </div>
+      <p className="mb-6 text-sm text-bark-400">
+        Your gear is organized into lists. Picking cards in the trip wizard adds their lists — and all
+        the gear on them — to your trip's packing list.
+      </p>
       <AnimatePresence mode="wait">
         <motion.div
           key={tab}

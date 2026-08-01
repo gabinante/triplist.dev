@@ -40,6 +40,7 @@ const GROUP_ORDER = [
   'all-inclusive',
   'car',
   'solo',
+  'group',
   'always',
 ]
 

@@ -75,6 +75,7 @@ export const seedTags: Tag[] = [
   { id: 'fire', name: 'Fire', icon: 'Flame', description: 'Campfire gear — only when fires are allowed' },
   { id: 'water', name: 'Water', icon: 'Waves', description: 'Lake or river gear — boats, boards, paddles' },
   { id: 'solo', name: 'Solo', icon: 'User', description: 'Traveling light, party of one' },
+  { id: 'group', name: 'Group', icon: 'Users', description: 'Extra supplies for when the whole crew comes' },
   { id: 'lan', name: 'LAN', icon: 'Gamepad2', description: 'LAN party — rig, peripherals, cables, caffeine' },
   { id: 'business', name: 'Business', icon: 'Briefcase', description: 'Work travel — laptop, chargers, presentable clothes' },
   { id: 'hotel', name: 'Hotel', icon: 'Building2', description: 'Hotel stays — day bag, chargers, dopp kit' },
@@ -82,7 +83,7 @@ export const seedTags: Tag[] = [
 ]
 
 /** Bump when seed tags/cards are added so existing saves pick them up. */
-export const SEED_VERSION = 3
+export const SEED_VERSION = 4
 
 export const wizardSteps: WizardStep[] = [
   {
@@ -211,7 +212,7 @@ export const wizardSteps: WizardStep[] = [
         title: 'With the Crew',
         subtitle: 'Friends, family, the whole camp',
         icon: 'Users',
-        tags: [],
+        tags: ['group'],
       },
     ],
   },

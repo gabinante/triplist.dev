@@ -95,6 +95,15 @@ export function normalizeState(state: State): State {
             }),
           }))
         }
+        if (from < 4) {
+          // v4: the "With the Crew" card now applies the new Group list
+          state.wizard = state.wizard.map(step => ({
+            ...step,
+            cards: step.cards.map(c =>
+              c.id === 'group' && !c.tags.includes('group') ? { ...c, tags: [...c.tags, 'group'] } : c,
+            ),
+          }))
+        }
         state.seedVersion = SEED_VERSION
       }
       return state

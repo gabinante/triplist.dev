@@ -108,6 +108,37 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
                   </p>
                 )}
               </div>
+              {/* Running tally of every list the trip will get, live as cards toggle */}
+              <div className="mb-5 flex min-h-7 flex-wrap items-center justify-center gap-1.5">
+                <AnimatePresence mode="popLayout">
+                  {[...chosenTags.filter(t => !autoLists.some(a => a.id === t)), ...autoLists.map(a => a.id)].map(
+                    tagId => {
+                      const tag = state.tags.find(t => t.id === tagId)
+                      const isAuto = autoLists.some(a => a.id === tagId)
+                      return (
+                        <motion.span
+                          key={tagId}
+                          layout
+                          initial={{ opacity: 0, scale: 0.7 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.7 }}
+                          transition={{ duration: 0.15 }}
+                        >
+                          <Chip active={!isAuto} className={isAuto ? 'border-moss-400/30 bg-moss-500/10 text-moss-300' : ''}>
+                            {tag && <DynamicIcon name={tag.icon} className="h-3 w-3" />}
+                            {tag?.name ?? tagId}
+                            {isAuto && (
+                              <span className="text-[9px] font-semibold uppercase tracking-wide text-moss-400/80">
+                                auto
+                              </span>
+                            )}
+                          </Chip>
+                        </motion.span>
+                      )
+                    },
+                  )}
+                </AnimatePresence>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 {step.cards.map(card => {
                   const active = (picks[step.id] ?? []).includes(card.id)
@@ -159,7 +190,7 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
                     <input
                       autoFocus
                       className={inputClass}
-                      placeholder="e.g. Fall trip to Moran Lake"
+                      placeholder="e.g. Fall trip to Fallen Leaf Lake"
                       value={name}
                       onChange={e => setName(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && canAdvance && createTrip()}
