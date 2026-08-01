@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Backpack, Map, Shapes, TentTree } from 'lucide-react'
 import { StoreProvider } from './store'
 import { PlanWizard } from './views/PlanWizard'
@@ -6,6 +6,7 @@ import { TripsView } from './views/Trips'
 import { GearView } from './views/Gear'
 import { StylesView } from './views/Styles'
 import { AccountSection } from './components/Account'
+import { useInbox } from './lib/shares'
 
 type View = 'plan' | 'trips' | 'gear' | 'styles'
 
@@ -20,6 +21,18 @@ export default function App() {
   const [view, setView] = useState<View>('plan')
   const [selectedTrip, setSelectedTrip] = useState<string | null>(null)
   const [wizardKey, setWizardKey] = useState(0)
+  const [fromShareLink, setFromShareLink] = useState(false)
+  const { invites, refresh: refreshInbox } = useInbox()
+
+  // Invite-email links land on /?share=… — go straight to My Trips.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.has('share')) {
+      setFromShareLink(true)
+      setView('trips')
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+  }, [])
 
   const openTrip = (id: string | null) => {
     setSelectedTrip(id)
@@ -56,7 +69,14 @@ export default function App() {
                     : 'border border-transparent text-bark-400 hover:bg-white/5 hover:text-bark-100'
                 }`}
               >
-                <Icon className="h-[18px] w-[18px] shrink-0" />
+                <span className="relative">
+                  <Icon className="h-[18px] w-[18px] shrink-0" />
+                  {id === 'trips' && invites.length > 0 && (
+                    <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-moss-400 px-1 text-[10px] font-bold text-bark-950">
+                      {invites.length}
+                    </span>
+                  )}
+                </span>
                 <span className="hidden md:inline">{label}</span>
               </button>
             ))}
@@ -70,7 +90,14 @@ export default function App() {
         <main className="min-w-0 flex-1 px-4 py-8 pb-20 sm:px-8">
           {view === 'plan' && <PlanWizard key={wizardKey} onDone={openTrip} />}
           {view === 'trips' && (
-            <TripsView selectedId={selectedTrip} onSelect={setSelectedTrip} onPlanNew={planNew} />
+            <TripsView
+              selectedId={selectedTrip}
+              onSelect={setSelectedTrip}
+              onPlanNew={planNew}
+              invites={invites}
+              onInboxChange={refreshInbox}
+              fromShareLink={fromShareLink}
+            />
           )}
           {view === 'gear' && <GearView />}
           {view === 'styles' && <StylesView />}

@@ -33,6 +33,7 @@ type Action =
   | { type: 'deleteTrip'; id: string }
   | { type: 'setWizard'; wizard: WizardStep[] }
   | { type: 'hydrate'; state: State }
+  | { type: 'importTrip'; trip: Trip; items: Item[]; tags: Tag[] }
   | { type: 'resetData' }
 
 const STORAGE_KEY = 'triplist-v1'
@@ -165,6 +166,22 @@ function reducer(state: State, action: Action): State {
       return { ...state, wizard: action.wizard }
     case 'hydrate':
       return normalizeState(action.state)
+    case 'importTrip': {
+      // Accepting a shared trip: keep the recipient's versions of any gear/
+      // lists they already have, add what's missing, start unpacked.
+      const trip: Trip = {
+        ...action.trip,
+        id: state.trips.some(t => t.id === action.trip.id) ? makeId(action.trip.name) : action.trip.id,
+        packed: {},
+        createdAt: Date.now(),
+      }
+      return {
+        ...state,
+        items: unionById(state.items, action.items),
+        tags: unionById(state.tags, action.tags),
+        trips: [trip, ...state.trips],
+      }
+    }
     case 'resetData':
       return { items: seedItems, tags: seedTags, trips: [], wizard: wizardSteps, seedVersion: SEED_VERSION }
   }

@@ -18,6 +18,10 @@ import type { Item, Trip } from '../types'
 import { Button, Chip, DynamicIcon, GlassPanel, Modal, ProgressRing } from '../components/ui'
 import { useAuthAvailable, useSession } from '../lib/auth-client'
 import { AuthModal } from '../components/AuthModal'
+import { ShareModal } from '../components/ShareModal'
+import { respondToInvite } from '../lib/shares'
+import type { Invite } from '../lib/shares'
+import { Inbox, Share2 } from 'lucide-react'
 
 const GROUP_ORDER = [
   'toiletries',
@@ -43,15 +47,123 @@ export function TripsView({
   selectedId,
   onSelect,
   onPlanNew,
+  invites,
+  onInboxChange,
+  fromShareLink,
 }: {
   selectedId: string | null
   onSelect: (id: string | null) => void
   onPlanNew: () => void
+  invites: Invite[]
+  onInboxChange: () => void
+  fromShareLink: boolean
 }) {
   const { state } = useStore()
   const trip = state.trips.find(t => t.id === selectedId)
   if (trip) return <TripDetail trip={trip} onBack={() => onSelect(null)} />
-  return <TripGrid onSelect={onSelect} onPlanNew={onPlanNew} />
+  return (
+    <TripGrid
+      onSelect={onSelect}
+      onPlanNew={onPlanNew}
+      invites={invites}
+      onInboxChange={onInboxChange}
+      fromShareLink={fromShareLink}
+    />
+  )
+}
+
+function InviteInbox({ invites, onInboxChange }: { invites: Invite[]; onInboxChange: () => void }) {
+  const { dispatch } = useStore()
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  const respond = async (invite: Invite, action: 'accept' | 'decline') => {
+    setBusyId(invite.id)
+    try {
+      const result = await respondToInvite(invite.id, action)
+      if (action === 'accept' && result.snapshot) {
+        dispatch({
+          type: 'importTrip',
+          trip: result.snapshot.trip,
+          items: result.snapshot.items,
+          tags: result.snapshot.tags,
+        })
+      }
+    } finally {
+      setBusyId(null)
+      onInboxChange()
+    }
+  }
+
+  if (invites.length === 0) return null
+  return (
+    <div className="mb-6">
+      <div className="mb-2 flex items-center gap-2 px-1">
+        <Inbox className="h-4 w-4 text-moss-400" />
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-bark-300">Invites</h3>
+        <span className="rounded-full bg-moss-500/20 px-2 py-0.5 text-[10px] font-bold text-moss-300">
+          {invites.length}
+        </span>
+      </div>
+      <div className="space-y-3">
+        {invites.map(invite => (
+          <motion.div
+            key={invite.id}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass rounded-2xl border-moss-400/25 p-4"
+          >
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-moss-500/25 text-sm font-bold text-moss-200">
+                {(invite.owner_name || invite.owner_email).charAt(0).toUpperCase()}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm text-bark-100">
+                  <span className="font-semibold text-bark-50">{invite.owner_name || invite.owner_email}</span>{' '}
+                  invited you to pack for{' '}
+                  <span className="font-semibold text-moss-300">"{invite.trip_name}"</span>
+                </p>
+                <p className="mt-0.5 text-xs text-bark-500">
+                  {invite.item_count} items · from {invite.owner_email} ·{' '}
+                  {new Date(invite.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                </p>
+                {invite.message && (
+                  <p className="mt-1.5 border-l-2 border-moss-500/50 pl-2.5 text-sm italic text-bark-300">
+                    "{invite.message}"
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={() => respond(invite, 'accept')} disabled={busyId === invite.id}>
+                  <span className="flex items-center gap-1.5">
+                    <Check className="h-4 w-4" /> Accept
+                  </span>
+                </Button>
+                <Button variant="ghost" onClick={() => respond(invite, 'decline')} disabled={busyId === invite.id}>
+                  Decline
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ShareLinkPrompt() {
+  const [authOpen, setAuthOpen] = useState(false)
+  return (
+    <>
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-moss-400/25 bg-moss-500/10 px-4 py-3">
+        <p className="text-sm text-moss-200">
+          <span className="font-semibold">Someone shared a trip with you!</span>{' '}
+          <span className="text-moss-300/90">Sign in with the email it was sent to and it'll be waiting here.</span>
+        </p>
+        <Button onClick={() => setAuthOpen(true)}>Sign in to see it</Button>
+      </div>
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode="signup" />
+    </>
+  )
 }
 
 function SaveTripsNudge() {
@@ -76,10 +188,23 @@ function SaveTripsNudge() {
   )
 }
 
-function TripGrid({ onSelect, onPlanNew }: { onSelect: (id: string) => void; onPlanNew: () => void }) {
+function TripGrid({
+  onSelect,
+  onPlanNew,
+  invites,
+  onInboxChange,
+  fromShareLink,
+}: {
+  onSelect: (id: string) => void
+  onPlanNew: () => void
+  invites: Invite[]
+  onInboxChange: () => void
+  fromShareLink: boolean
+}) {
   const { state, dispatch } = useStore()
+  const { data: session } = useSession()
 
-  if (state.trips.length === 0) {
+  if (state.trips.length === 0 && invites.length === 0 && !fromShareLink) {
     return (
       <div className="mx-auto max-w-md pt-16 text-center">
         <div className="mx-auto mb-4 w-fit rounded-2xl bg-moss-500/15 p-4 text-moss-300">
@@ -104,6 +229,8 @@ function TripGrid({ onSelect, onPlanNew }: { onSelect: (id: string) => void; onP
           </span>
         </Button>
       </div>
+      {fromShareLink && !session?.user && <ShareLinkPrompt />}
+      <InviteInbox invites={invites} onInboxChange={onInboxChange} />
       <SaveTripsNudge />
       <div className="grid gap-4 sm:grid-cols-2">
         {state.trips.map((trip, i) => {
@@ -174,6 +301,10 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
   const { state, dispatch } = useStore()
   const [addOpen, setAddOpen] = useState(false)
   const [editTags, setEditTags] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
+  const [authOpen, setAuthOpen] = useState(false)
+  const authAvailable = useAuthAvailable()
+  const { data: session } = useSession()
 
   const list = tripItems(trip, state.items)
   const { packed, total } = tripProgress(trip, state.items)
@@ -292,6 +423,13 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
               <RotateCcw className="h-4 w-4" /> Reset
             </span>
           </Button>
+          {authAvailable && (
+            <Button variant="ghost" onClick={() => (session?.user ? setShareOpen(true) : setAuthOpen(true))}>
+              <span className="flex items-center gap-1.5">
+                <Share2 className="h-4 w-4" /> Share
+              </span>
+            </Button>
+          )}
         </div>
       </GlassPanel>
 
@@ -366,6 +504,8 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
       </div>
 
       <AddItemModal trip={trip} open={addOpen} onClose={() => setAddOpen(false)} />
+      <ShareModal trip={trip} open={shareOpen} onClose={() => setShareOpen(false)} />
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode="signup" />
     </div>
   )
 }

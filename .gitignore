@@ -5,3 +5,5 @@ dist
 .playwright-mcp
 *.png
 .claude/*.lock
+.env
+.env.*
