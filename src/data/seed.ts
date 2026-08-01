@@ -48,7 +48,12 @@ export const seedTags: Tag[] = [
   { id: 'solo', name: 'Solo', icon: 'User', description: 'Traveling light, party of one' },
   { id: 'lan', name: 'LAN', icon: 'Gamepad2', description: 'LAN party — rig, peripherals, cables, caffeine' },
   { id: 'business', name: 'Business', icon: 'Briefcase', description: 'Work travel — laptop, chargers, presentable clothes' },
+  { id: 'hotel', name: 'Hotel', icon: 'Building2', description: 'Hotel stays — day bag, chargers, dopp kit' },
+  { id: 'all-inclusive', name: 'All-Inclusive', icon: 'Ship', description: 'Cruises & resorts — documents, swimwear, sea-sickness meds' },
 ]
+
+/** Bump when seed tags/cards are added so existing saves pick them up. */
+export const SEED_VERSION = 2
 
 export const wizardSteps: WizardStep[] = [
   {
@@ -99,12 +104,19 @@ export const wizardSteps: WizardStep[] = [
         icon: 'Briefcase',
         tags: ['business', 'toiletries'],
       },
+      {
+        id: 'cruise',
+        title: 'Cruise',
+        subtitle: 'Set sail — resort life on the water',
+        icon: 'Ship',
+        tags: ['toiletries'],
+      },
     ],
   },
   {
     id: 'site',
-    title: 'Site conditions',
-    prompt: 'What does the site allow and offer?',
+    title: 'Accommodations & site',
+    prompt: 'Where are you staying — and what does it offer?',
     multi: true,
     optional: true,
     cards: [
@@ -135,6 +147,20 @@ export const wizardSteps: WizardStep[] = [
         subtitle: 'Full camp kitchen — stove, cooler, the works',
         icon: 'CookingPot',
         tags: ['kitchen'],
+      },
+      {
+        id: 'hotel-room',
+        title: 'Hotel Room',
+        subtitle: 'A real bed and a shower — pack for the room, not the site',
+        icon: 'Building2',
+        tags: ['hotel'],
+      },
+      {
+        id: 'all-inclusive',
+        title: 'All-Inclusive',
+        subtitle: 'Cruise ship or resort — they handle the rest',
+        icon: 'Ship',
+        tags: ['all-inclusive'],
       },
     ],
   },

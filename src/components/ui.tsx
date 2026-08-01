@@ -2,7 +2,7 @@ import type { ReactNode } from 'react'
 import {
   Armchair, Backpack, Bed, Bike, Briefcase, Building2, Car, Coffee, Compass, CookingPot, Dog,
   Droplets, Fish, Flame, Gamepad2, Laptop, MapPin, Moon, Mountain, Music, Package, PartyPopper,
-  Plane, Snowflake, Sparkles, Star, Sun, Tent, TreePine, User, Users, Waves, Wifi, X, Zap,
+  Plane, Ship, Snowflake, Sparkles, Star, Sun, Tent, TreePine, User, Users, Waves, Wifi, X, Zap,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 const ICONS: Record<string, LucideIcon> = {
   Armchair, Backpack, Bed, Bike, Briefcase, Building2, Car, Coffee, Compass, CookingPot, Dog,
   Droplets, Fish, Flame, Gamepad2, Laptop, MapPin, Moon, Mountain, Music, Package, PartyPopper,
-  Plane, Snowflake, Sparkles, Star, Sun, Tent, TreePine, User, Users, Waves, Wifi, Zap,
+  Plane, Ship, Snowflake, Sparkles, Star, Sun, Tent, TreePine, User, Users, Waves, Wifi, Zap,
 }
 
 /** Icon names offered in list/card editors — everything in the dynamic icon registry. */

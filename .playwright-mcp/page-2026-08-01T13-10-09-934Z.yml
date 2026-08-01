@@ -1,0 +1,162 @@
+- generic [ref=f12e4]:
+  - complementary [ref=f12e5]:
+    - generic [ref=f12e6]: TripList
+    - navigation [ref=f12e15]:
+      - button "Plan My Trip" [ref=f12e16] [cursor=pointer]
+      - button "My Trips" [ref=f12e20] [cursor=pointer]
+      - button "Gear & Lists" [ref=f12e28] [cursor=pointer]
+      - button "Trip Styles" [active] [ref=f12e34] [cursor=pointer]
+    - generic [ref=f12e40]: Layered lists for every kind of trip.
+  - main [ref=f12e41]:
+    - generic [ref=f12e113]:
+      - heading "Trip Styles" [level=1] [ref=f12e115]
+      - paragraph [ref=f12e116]: These are the cards the "Plan My Trip" wizard offers — camping, LAN events, business trips, the sky's the limit. Each card stacks a set of lists onto the trip.
+      - generic [ref=f12e117]:
+        - generic [ref=f12e118]:
+          - generic [ref=f12e119]:
+            - generic [ref=f12e120]:
+              - heading "Trip style" [level=2] [ref=f12e121]
+              - paragraph [ref=f12e122]: "\"What kind of trip is this?\" · multiple choice"
+            - button [ref=f12e123] [cursor=pointer]
+          - generic [ref=f12e126]:
+            - generic [ref=f12e127]:
+              - generic [ref=f12e133]:
+                - heading "Car Camping" [level=3] [ref=f12e134]
+                - paragraph [ref=f12e135]: Drive right up to the site — bring the comforts
+                - generic [ref=f12e136]:
+                  - generic [ref=f12e137]: Always
+                  - generic [ref=f12e138]: Toiletries
+                  - generic [ref=f12e139]: Tent
+                  - generic [ref=f12e140]: Car
+                  - generic [ref=f12e141]: Kitchen
+                  - generic [ref=f12e142]: Living
+              - button [ref=f12e143] [cursor=pointer]
+              - button [ref=f12e147] [cursor=pointer]
+            - generic [ref=f12e151]:
+              - generic [ref=f12e155]:
+                - heading "Hike-In" [level=3] [ref=f12e156]
+                - paragraph [ref=f12e157]: Carry it on your back — pack light, pack smart
+                - generic [ref=f12e158]:
+                  - generic [ref=f12e159]: Always
+                  - generic [ref=f12e160]: Toiletries
+                  - generic [ref=f12e161]: Tent
+                  - generic [ref=f12e162]: Survival
+              - button [ref=f12e163] [cursor=pointer]
+              - button [ref=f12e167] [cursor=pointer]
+            - generic [ref=f12e171]:
+              - generic [ref=f12e179]:
+                - heading "Festival" [level=3] [ref=f12e180]
+                - paragraph [ref=f12e181]: Music, decor, shade, and a good camp scene
+                - generic [ref=f12e182]:
+                  - generic [ref=f12e183]: Always
+                  - generic [ref=f12e184]: Toiletries
+                  - generic [ref=f12e185]: Festival
+                  - generic [ref=f12e186]: Living
+                  - generic [ref=f12e187]: Car
+              - button [ref=f12e188] [cursor=pointer]
+              - button [ref=f12e192] [cursor=pointer]
+            - generic [ref=f12e196]:
+              - generic [ref=f12e200]:
+                - heading "Glamping" [level=3] [ref=f12e201]
+                - paragraph [ref=f12e202]: All the fancy comforts, none of the roughing it
+                - generic [ref=f12e203]:
+                  - generic [ref=f12e204]: Always
+                  - generic [ref=f12e205]: Toiletries
+                  - generic [ref=f12e206]: Glamping
+                  - generic [ref=f12e207]: Kitchen
+                  - generic [ref=f12e208]: Living
+              - button [ref=f12e209] [cursor=pointer]
+              - button [ref=f12e213] [cursor=pointer]
+            - generic [ref=f12e217]:
+              - generic [ref=f12e221]:
+                - heading "LAN Event" [level=3] [ref=f12e222]
+                - paragraph [ref=f12e223]: Rig, peripherals, cables, and caffeine
+                - generic [ref=f12e224]: LAN
+              - button [ref=f12e226] [cursor=pointer]
+              - button [ref=f12e230] [cursor=pointer]
+            - generic [ref=f12e234]:
+              - generic [ref=f12e239]:
+                - heading "Business Trip" [level=3] [ref=f12e240]
+                - paragraph [ref=f12e241]: Work travel — pack light and presentable
+                - generic [ref=f12e242]:
+                  - generic [ref=f12e243]: Business
+                  - generic [ref=f12e244]: Toiletries
+              - button [ref=f12e245] [cursor=pointer]
+              - button [ref=f12e249] [cursor=pointer]
+            - generic [ref=f12e253]:
+              - generic [ref=f12e259]:
+                - heading "Cruise" [level=3] [ref=f12e260]
+                - paragraph [ref=f12e261]: Set sail — resort life on the water
+                - generic [ref=f12e262]: Toiletries
+              - button [ref=f12e264] [cursor=pointer]
+              - button [ref=f12e268] [cursor=pointer]
+        - generic [ref=f12e272]:
+          - generic [ref=f12e273]:
+            - generic [ref=f12e274]:
+              - heading "Accommodations & site" [level=2] [ref=f12e275]
+              - paragraph [ref=f12e276]: "\"Where are you staying — and what does it offer?\" · multiple choice · skippable"
+            - button [ref=f12e277] [cursor=pointer]
+          - generic [ref=f12e280]:
+            - generic [ref=f12e281]:
+              - generic [ref=f12e285]:
+                - heading "Fires Allowed" [level=3] [ref=f12e286]
+                - paragraph [ref=f12e287]: Firewood, kindling, and marshmallow sticks
+                - generic [ref=f12e288]: Fire
+              - button [ref=f12e290] [cursor=pointer]
+              - button [ref=f12e294] [cursor=pointer]
+            - generic [ref=f12e298]:
+              - generic [ref=f12e304]:
+                - heading "Water Nearby" [level=3] [ref=f12e305]
+                - paragraph [ref=f12e306]: Lake or river — bring the boats and boards
+                - generic [ref=f12e307]: Water
+              - button [ref=f12e309] [cursor=pointer]
+              - button [ref=f12e313] [cursor=pointer]
+            - generic [ref=f12e317]:
+              - generic [ref=f12e322]:
+                - heading "Off-Grid" [level=3] [ref=f12e323]
+                - paragraph [ref=f12e324]: No facilities — bring survival and safety gear
+                - generic [ref=f12e325]: Survival
+              - button [ref=f12e327] [cursor=pointer]
+              - button [ref=f12e331] [cursor=pointer]
+            - generic [ref=f12e335]:
+              - generic [ref=f12e341]:
+                - heading "Cooking Camp" [level=3] [ref=f12e342]
+                - paragraph [ref=f12e343]: Full camp kitchen — stove, cooler, the works
+                - generic [ref=f12e344]: Kitchen
+              - button [ref=f12e346] [cursor=pointer]
+              - button [ref=f12e350] [cursor=pointer]
+            - generic [ref=f12e354]:
+              - generic [ref=f12e360]:
+                - heading "Hotel Room" [level=3] [ref=f12e361]
+                - paragraph [ref=f12e362]: A real bed and a shower — pack for the room, not the site
+                - generic [ref=f12e363]: Hotel
+              - button [ref=f12e365] [cursor=pointer]
+              - button [ref=f12e369] [cursor=pointer]
+            - generic [ref=f12e373]:
+              - generic [ref=f12e379]:
+                - heading "All-Inclusive" [level=3] [ref=f12e380]
+                - paragraph [ref=f12e381]: Cruise ship or resort — they handle the rest
+                - generic [ref=f12e382]: All-Inclusive
+              - button [ref=f12e384] [cursor=pointer]
+              - button [ref=f12e388] [cursor=pointer]
+        - generic [ref=f12e392]:
+          - generic [ref=f12e393]:
+            - generic [ref=f12e394]:
+              - heading "Crew" [level=2] [ref=f12e395]
+              - paragraph [ref=f12e396]: "\"Who's going?\" · single choice"
+            - button [ref=f12e397] [cursor=pointer]
+          - generic [ref=f12e400]:
+            - generic [ref=f12e401]:
+              - generic [ref=f12e406]:
+                - heading "Going Solo" [level=3] [ref=f12e407]
+                - paragraph [ref=f12e408]: Just you — travel light
+                - generic [ref=f12e409]: Solo
+              - button [ref=f12e411] [cursor=pointer]
+              - button [ref=f12e415] [cursor=pointer]
+            - generic [ref=f12e419]:
+              - generic [ref=f12e426]:
+                - heading "With the Crew" [level=3] [ref=f12e427]
+                - paragraph [ref=f12e428]: Friends, family, the whole camp
+                - generic [ref=f12e429]: adds no lists
+              - button [ref=f12e431] [cursor=pointer]
+              - button [ref=f12e435] [cursor=pointer]

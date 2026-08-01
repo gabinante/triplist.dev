@@ -1,13 +1,14 @@
 import { createContext, useContext, useEffect, useReducer } from 'react'
 import type { ReactNode } from 'react'
 import type { Item, Tag, Trip, WizardStep } from './types'
-import { CONSUMABLE_IDS, seedItems, seedTags, wizardSteps } from './data/seed'
+import { CONSUMABLE_IDS, SEED_VERSION, seedItems, seedTags, wizardSteps } from './data/seed'
 
 interface State {
   items: Item[]
   tags: Tag[]
   trips: Trip[]
   wizard: WizardStep[]
+  seedVersion?: number
 }
 
 type Action =
@@ -35,18 +36,26 @@ function initialState(): State {
         ...i,
         kind: i.kind ?? (CONSUMABLE_IDS.has(i.id) ? 'consumable' : 'gear'),
       }))
-      // migrate saves from before the wizard became configurable,
-      // pulling in any seed lists (lan, business) added alongside it
-      if (!state.wizard) {
-        state.wizard = wizardSteps
+      // migrate saves from before the wizard became configurable
+      if (!state.wizard) state.wizard = wizardSteps
+      // pull in seed tags/cards added since this save was created, without
+      // resurrecting anything the user has since deleted or edited
+      if ((state.seedVersion ?? 1) < SEED_VERSION) {
         state.tags = [...state.tags, ...seedTags.filter(t => !state.tags.some(s => s.id === t.id))]
+        state.wizard = state.wizard.map(step => {
+          const seedStep = wizardSteps.find(s => s.id === step.id)
+          if (!seedStep) return step
+          const newCards = seedStep.cards.filter(c => !step.cards.some(x => x.id === c.id))
+          return { ...step, title: seedStep.title, prompt: seedStep.prompt, cards: [...step.cards, ...newCards] }
+        })
+        state.seedVersion = SEED_VERSION
       }
       return state
     }
   } catch {
     // fall through to seed
   }
-  return { items: seedItems, tags: seedTags, trips: [], wizard: wizardSteps }
+  return { items: seedItems, tags: seedTags, trips: [], wizard: wizardSteps, seedVersion: SEED_VERSION }
 }
 
 function reducer(state: State, action: Action): State {
@@ -89,7 +98,7 @@ function reducer(state: State, action: Action): State {
     case 'setWizard':
       return { ...state, wizard: action.wizard }
     case 'resetData':
-      return { items: seedItems, tags: seedTags, trips: [], wizard: wizardSteps }
+      return { items: seedItems, tags: seedTags, trips: [], wizard: wizardSteps, seedVersion: SEED_VERSION }
   }
 }
 
