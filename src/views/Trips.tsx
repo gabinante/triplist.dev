@@ -82,12 +82,16 @@ function InviteInbox({ invites, onInboxChange }: { invites: Invite[]; onInboxCha
     try {
       const result = await respondToInvite(invite.id, action)
       if (action === 'accept' && result.snapshot) {
-        dispatch({
-          type: 'importTrip',
-          trip: result.snapshot.trip,
-          items: result.snapshot.items,
-          tags: result.snapshot.tags,
-        })
+        if ('trip' in result.snapshot) {
+          dispatch({
+            type: 'importTrip',
+            trip: result.snapshot.trip,
+            items: result.snapshot.items,
+            tags: result.snapshot.tags,
+          })
+        } else {
+          dispatch({ type: 'importList', tag: result.snapshot.tag, items: result.snapshot.items })
+        }
       }
     } finally {
       setBusyId(null)
@@ -120,8 +124,9 @@ function InviteInbox({ invites, onInboxChange }: { invites: Invite[]; onInboxCha
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-bark-100">
                   <span className="font-semibold text-bark-50">{invite.owner_name || invite.owner_email}</span>{' '}
-                  invited you to pack for{' '}
-                  <span className="font-semibold text-moss-300">"{invite.trip_name}"</span>
+                  {invite.kind === 'trip' ? 'invited you to pack for' : 'shared the list'}{' '}
+                  <span className="font-semibold text-moss-300">"{invite.name}"</span>
+                  {invite.kind === 'list' && ' with you'}
                 </p>
                 <p className="mt-0.5 text-xs text-bark-500">
                   {invite.item_count} items · from {invite.owner_email} ·{' '}
@@ -184,7 +189,7 @@ function ShareLinkPrompt({ shareId }: { shareId: string }) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-moss-200">
             <span className="font-semibold">
-              {info.owner_name} shared "{info.trip_name}" with you
+              {info.owner_name} shared {info.kind === 'list' ? 'the list ' : ''}"{info.name}" with you
             </span>{' '}
             <span className="text-moss-300/90">— {info.item_count} items, waiting for you to accept.</span>
           </p>
@@ -540,7 +545,7 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                           e.stopPropagation()
                           removeItem(item.id)
                         }}
-                        className="rounded p-1 text-bark-600 opacity-0 transition-opacity hover:text-red-300 group-hover:opacity-100 cursor-pointer"
+                        className="rounded p-1 text-bark-600 opacity-40 transition-opacity hover:text-red-300 hover:opacity-100 group-hover:opacity-70 cursor-pointer"
                         title="Remove from this trip"
                       >
                         <Minus className="h-4 w-4" />
@@ -555,7 +560,18 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
       </div>
 
       <AddItemModal trip={trip} open={addOpen} onClose={() => setAddOpen(false)} />
-      <ShareModal trip={trip} open={shareOpen} onClose={() => setShareOpen(false)} />
+      <ShareModal
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+        kind="trip"
+        name={trip.name}
+        itemCount={list.length}
+        buildSnapshot={() => ({
+          trip: { ...trip, packed: {} },
+          items: tripItems(trip, state.items),
+          tags: state.tags.filter(t => trip.tagIds.includes(t.id)),
+        })}
+      />
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode="signup" />
     </div>
   )

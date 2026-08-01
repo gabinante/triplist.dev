@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { AlertTriangle, Minus, Package, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { AlertTriangle, Minus, Package, Pencil, Plus, Search, Share2, Trash2 } from 'lucide-react'
 import { makeId, useStore } from '../store'
 import type { Item, ItemKind, Tag } from '../types'
 import { Button, Chip, DynamicIcon, GlassPanel, ICON_CHOICES, Modal, inputClass } from '../components/ui'
+import { useAuthAvailable, useSession } from '../lib/auth-client'
+import { ShareModal } from '../components/ShareModal'
+import { AuthModal } from '../components/AuthModal'
 
 type GearTab = 'gear' | 'consumables' | 'lists'
 
@@ -321,6 +324,10 @@ function ListManager() {
   const { state, dispatch } = useStore()
   const [editing, setEditing] = useState<Tag | null>(null)
   const [creating, setCreating] = useState(false)
+  const [sharing, setSharing] = useState<Tag | null>(null)
+  const [authOpen, setAuthOpen] = useState(false)
+  const authAvailable = useAuthAvailable()
+  const { data: session } = useSession()
 
   return (
     <>
@@ -355,6 +362,15 @@ function ListManager() {
                   {count} items{tag.description ? ` · ${tag.description}` : ''}
                 </p>
               </div>
+              {authAvailable && (
+                <button
+                  onClick={() => (session?.user ? setSharing(tag) : setAuthOpen(true))}
+                  className="rounded p-1.5 text-bark-500 hover:bg-white/10 hover:text-moss-300 cursor-pointer"
+                  title="Share this list"
+                >
+                  <Share2 className="h-4 w-4" />
+                </button>
+              )}
               <button
                 onClick={() => setEditing(tag)}
                 className="rounded p-1.5 text-bark-500 hover:bg-white/10 hover:text-bark-100 cursor-pointer"
@@ -382,6 +398,20 @@ function ListManager() {
           setEditing(null)
         }}
       />
+      {sharing && (
+        <ShareModal
+          open
+          onClose={() => setSharing(null)}
+          kind="list"
+          name={sharing.name}
+          itemCount={state.items.filter(i => i.tags.includes(sharing.id)).length}
+          buildSnapshot={() => ({
+            tag: sharing,
+            items: state.items.filter(i => i.tags.includes(sharing.id)),
+          })}
+        />
+      )}
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialMode="signup" />
     </>
   )
 }

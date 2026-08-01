@@ -36,6 +36,7 @@ type Action =
   | { type: 'setWizard'; wizard: WizardStep[] }
   | { type: 'hydrate'; state: State }
   | { type: 'importTrip'; trip: Trip; items: Item[]; tags: Tag[] }
+  | { type: 'importList'; tag: Tag; items: Item[] }
   | { type: 'resetData' }
 
 const STORAGE_KEY = 'triplist-v1'
@@ -199,6 +200,23 @@ function reducer(state: State, action: Action): State {
         items: unionById(state.items, action.items),
         tags: unionById(state.tags, action.tags),
         trips: [trip, ...state.trips],
+      }
+    }
+    case 'importList': {
+      // Accepting a shared list: keep the recipient's versions of gear they
+      // already own but make sure it carries the shared list's tag; new gear
+      // comes in as-is.
+      const incoming = new Map(action.items.map(i => [i.id, i]))
+      const items = state.items.map(i => {
+        const inc = incoming.get(i.id)
+        return inc && inc.tags.includes(action.tag.id) && !i.tags.includes(action.tag.id)
+          ? { ...i, tags: [...i.tags, action.tag.id] }
+          : i
+      })
+      return {
+        ...state,
+        tags: unionById(state.tags, [action.tag]),
+        items: [...items, ...action.items.filter(inc => !state.items.some(i => i.id === inc.id))],
       }
     }
     case 'resetData':

@@ -1,13 +1,26 @@
 import { useState } from 'react'
 import { Check, Send } from 'lucide-react'
-import { tripItems, useStore } from '../store'
-import type { Trip } from '../types'
-import { shareTrip } from '../lib/shares'
+import type { ListSnapshot, ShareKind, TripSnapshot } from '../lib/shares'
+import { share } from '../lib/shares'
 import { useFriends } from '../lib/friends'
 import { Button, Chip, Modal, inputClass } from './ui'
 
-export function ShareModal({ trip, open, onClose }: { trip: Trip; open: boolean; onClose: () => void }) {
-  const { state } = useStore()
+/** Share a trip or a list with someone by email (friends are one tap). */
+export function ShareModal({
+  open,
+  onClose,
+  kind,
+  name,
+  itemCount,
+  buildSnapshot,
+}: {
+  open: boolean
+  onClose: () => void
+  kind: ShareKind
+  name: string
+  itemCount: number
+  buildSnapshot: () => TripSnapshot | ListSnapshot
+}) {
   const { friends } = useFriends()
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
@@ -19,13 +32,7 @@ export function ShareModal({ trip, open, onClose }: { trip: Trip; open: boolean;
     setBusy(true)
     setError(null)
     try {
-      const items = tripItems(trip, state.items)
-      const tags = state.tags.filter(t => trip.tagIds.includes(t.id))
-      const result = await shareTrip(email.trim(), message.trim(), {
-        trip: { ...trip, packed: {} },
-        items,
-        tags,
-      })
+      const result = await share(kind, email.trim(), message.trim(), buildSnapshot())
       setSent({ emailed: result.emailed })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sharing failed — try again.')
@@ -43,7 +50,7 @@ export function ShareModal({ trip, open, onClose }: { trip: Trip; open: boolean;
   }
 
   return (
-    <Modal open={open} onClose={reset} title={`Share "${trip.name}"`}>
+    <Modal open={open} onClose={reset} title={kind === 'trip' ? `Share "${name}"` : `Share the "${name}" list`}>
       {sent ? (
         <div className="space-y-4 text-center">
           <div className="mx-auto w-fit rounded-2xl bg-moss-500/20 p-4 text-moss-300">
@@ -59,8 +66,9 @@ export function ShareModal({ trip, open, onClose }: { trip: Trip; open: boolean;
       ) : (
         <div className="space-y-4">
           <p className="text-sm text-bark-400">
-            They'll get their own copy of this packing list — {tripItems(trip, state.items).length} items — to
-            accept or decline.
+            {kind === 'trip'
+              ? `They'll get their own copy of this packing list — ${itemCount} items — to accept or decline.`
+              : `They'll get their own copy of this list and its ${itemCount} items to accept or decline.`}
           </p>
           {friends.length > 0 && (
             <div>

@@ -8,9 +8,17 @@ export interface TripSnapshot {
   tags: Tag[]
 }
 
+export interface ListSnapshot {
+  tag: Tag
+  items: Item[]
+}
+
+export type ShareKind = 'trip' | 'list'
+
 export interface Invite {
   id: string
-  trip_name: string
+  kind: ShareKind
+  name: string
   item_count: number
   owner_name: string
   owner_email: string
@@ -18,11 +26,16 @@ export interface Invite {
   created_at: string
 }
 
-export async function shareTrip(email: string, message: string, snapshot: TripSnapshot) {
+export async function share(
+  kind: ShareKind,
+  email: string,
+  message: string,
+  snapshot: TripSnapshot | ListSnapshot,
+) {
   const res = await fetch('/api/shares', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, message, snapshot }),
+    body: JSON.stringify({ kind, email, message, snapshot }),
   })
   const body = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(body.error ?? 'sharing failed')
@@ -31,8 +44,9 @@ export async function shareTrip(email: string, message: string, snapshot: TripSn
 
 export interface ShareLinkInfo {
   status: 'pending' | 'accepted' | 'declined'
+  kind: ShareKind
   recipient_email: string
-  trip_name: string
+  name: string
   item_count: number
   owner_name: string
   recipient_has_account: boolean
@@ -58,7 +72,7 @@ export async function respondToInvite(id: string, action: 'accept' | 'decline') 
   })
   const body = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(body.error ?? 'response failed')
-  return body as { ok: true; snapshot?: TripSnapshot }
+  return body as { ok: true; snapshot?: TripSnapshot | ListSnapshot }
 }
 
 /** Pending trip invites for the signed-in user, refreshed on focus + every 60s. */
