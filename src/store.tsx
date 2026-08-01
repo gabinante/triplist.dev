@@ -1,7 +1,17 @@
 import { createContext, useContext, useEffect, useReducer } from 'react'
 import type { ReactNode } from 'react'
 import type { Item, Tag, Trip, WizardStep } from './types'
-import { CONSUMABLE_IDS, SEED_VERSION, seedItems, seedTags, wizardSteps } from './data/seed'
+import {
+  CLOTHING_ITEMS,
+  CONSUMABLE_IDS,
+  SEED_VERSION,
+  rehomeBaseTags,
+  seedItems,
+  seedTags,
+  wizardSteps,
+} from './data/seed'
+
+const CAMP_STYLE_CARD_IDS = new Set(['car-camping', 'hike-in', 'festival', 'glamping'])
 
 interface State {
   items: Item[]
@@ -40,7 +50,8 @@ function initialState(): State {
       if (!state.wizard) state.wizard = wizardSteps
       // pull in seed tags/cards added since this save was created, without
       // resurrecting anything the user has since deleted or edited
-      if ((state.seedVersion ?? 1) < SEED_VERSION) {
+      const from = state.seedVersion ?? 1
+      if (from < SEED_VERSION) {
         state.tags = [...state.tags, ...seedTags.filter(t => !state.tags.some(s => s.id === t.id))]
         state.wizard = state.wizard.map(step => {
           const seedStep = wizardSteps.find(s => s.id === step.id)
@@ -48,6 +59,33 @@ function initialState(): State {
           const newCards = seedStep.cards.filter(c => !step.cards.some(x => x.id === c.id))
           return { ...step, title: seedStep.title, prompt: seedStep.prompt, cards: [...step.cards, ...newCards] }
         })
+        if (from < 3) {
+          // v3: "Always" becomes the auto-applied "Base" list scoped to clothes/
+          // toiletries/universals; camping gear moves to Camp Basics
+          state.tags = state.tags.map(t =>
+            t.id === 'always'
+              ? {
+                  ...t,
+                  auto: true,
+                  ...(t.name === 'Always'
+                    ? { name: 'Base', description: 'Clothes, toiletries, and basics — goes on every trip' }
+                    : {}),
+                }
+              : t,
+          )
+          state.items = [
+            ...state.items.map(i => ({ ...i, tags: rehomeBaseTags(i.tags, i.id) })),
+            ...CLOTHING_ITEMS.filter(c => !state.items.some(i => i.id === c.id)),
+          ]
+          state.wizard = state.wizard.map(step => ({
+            ...step,
+            cards: step.cards.map(c => {
+              let tags = c.tags.filter(t => t !== 'always')
+              if (CAMP_STYLE_CARD_IDS.has(c.id) && !tags.includes('camping')) tags = ['camping', ...tags]
+              return { ...c, tags }
+            }),
+          }))
+        }
         state.seedVersion = SEED_VERSION
       }
       return state

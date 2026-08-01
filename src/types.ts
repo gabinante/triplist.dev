@@ -14,6 +14,8 @@ export interface Tag {
   name: string
   icon: string
   description?: string
+  /** Automatically included on every trip (e.g. the Base list). */
+  auto?: boolean
 }
 
 export interface Trip {

@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ArrowRight, Check, Compass } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Compass, Plus } from 'lucide-react'
 import { makeId, tripItems, useStore } from '../store'
 import type { Trip } from '../types'
 import { Button, Chip, DynamicIcon, GlassPanel, inputClass } from '../components/ui'
+import { CardEditor } from '../components/CardEditor'
 
 export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
   const { state, dispatch } = useStore()
@@ -11,13 +12,15 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
   const [picks, setPicks] = useState<Record<string, string[]>>({})
   const [name, setName] = useState('')
   const [date, setDate] = useState('')
+  const [creatingCard, setCreatingCard] = useState(false)
 
   const steps = state.wizard
   const finalStep = stepIndex === steps.length
   const step = steps[stepIndex]
+  const autoLists = useMemo(() => state.tags.filter(t => t.auto), [state.tags])
 
   const chosenTags = useMemo(() => {
-    const tags = new Set<string>()
+    const tags = new Set<string>(autoLists.map(t => t.id))
     for (const s of steps) {
       for (const cardId of picks[s.id] ?? []) {
         const card = s.cards.find(c => c.id === cardId)
@@ -25,7 +28,7 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
       }
     }
     return [...tags]
-  }, [picks, steps])
+  }, [picks, steps, autoLists])
 
   const previewTrip: Trip = useMemo(
     () => ({
@@ -106,6 +109,24 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
                 )}
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
+                {stepIndex === 0 &&
+                  autoLists.map(tag => (
+                    <div key={tag.id} className="glass glass-active relative rounded-2xl p-5 text-left">
+                      <div className="flex items-start justify-between">
+                        <div className="rounded-xl bg-moss-500/30 p-2.5 text-moss-200">
+                          <DynamicIcon name={tag.icon} className="h-6 w-6" />
+                        </div>
+                        <span className="rounded-full bg-moss-400 p-1 text-bark-950">
+                          <Check className="h-3.5 w-3.5" />
+                        </span>
+                      </div>
+                      <h3 className="mt-3 font-semibold text-bark-50">{tag.name}</h3>
+                      <p className="mt-1 text-sm text-bark-400">{tag.description}</p>
+                      <span className="mt-2 inline-block rounded-full bg-moss-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-moss-300">
+                        On every trip
+                      </span>
+                    </div>
+                  ))}
                 {step.cards.map(card => {
                   const active = (picks[step.id] ?? []).includes(card.id)
                   return (
@@ -131,6 +152,16 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
                     </button>
                   )
                 })}
+                <button
+                  onClick={() => setCreatingCard(true)}
+                  className="flex min-h-36 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-white/15 bg-white/[0.02] p-5 text-bark-400 transition-all duration-150 hover:border-moss-400/40 hover:bg-moss-500/10 hover:text-moss-200"
+                >
+                  <span className="rounded-xl bg-white/5 p-2.5">
+                    <Plus className="h-6 w-6" />
+                  </span>
+                  <span className="font-semibold">Other</span>
+                  <span className="text-xs text-bark-500">Create your own card</span>
+                </button>
               </div>
             </>
           ) : (
@@ -207,6 +238,22 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
           </Button>
         )}
       </div>
+
+      {!finalStep && (
+        <CardEditor
+          open={creatingCard}
+          stepId={step.id}
+          card={null}
+          lockStep
+          onClose={() => setCreatingCard(false)}
+          onSaved={card =>
+            setPicks(prev => ({
+              ...prev,
+              [step.id]: step.multi ? [...(prev[step.id] ?? []), card.id] : [card.id],
+            }))
+          }
+        />
+      )}
     </div>
   )
 }

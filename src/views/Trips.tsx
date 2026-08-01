@@ -19,6 +19,7 @@ import { Button, Chip, DynamicIcon, GlassPanel, Modal, ProgressRing } from '../c
 
 const GROUP_ORDER = [
   'toiletries',
+  'camping',
   'kitchen',
   'living',
   'tent',
@@ -27,6 +28,10 @@ const GROUP_ORDER = [
   'water',
   'festival',
   'glamping',
+  'lan',
+  'business',
+  'hotel',
+  'all-inclusive',
   'car',
   'solo',
   'always',

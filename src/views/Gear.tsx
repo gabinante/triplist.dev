@@ -339,7 +339,14 @@ function ListManager() {
                 <DynamicIcon name={tag.icon} className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="font-semibold text-bark-50">{tag.name}</h3>
+                <h3 className="flex items-center gap-2 font-semibold text-bark-50">
+                  {tag.name}
+                  {tag.auto && (
+                    <span className="rounded-full bg-moss-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-moss-300">
+                      every trip
+                    </span>
+                  )}
+                </h3>
                 <p className="truncate text-xs text-bark-400">
                   {count} items{tag.description ? ` · ${tag.description}` : ''}
                 </p>
@@ -380,6 +387,7 @@ function TagModal({ open, tag, onClose }: { open: boolean; tag: Tag | null; onCl
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [icon, setIcon] = useState('Package')
+  const [auto, setAuto] = useState(false)
   const [loadedFor, setLoadedFor] = useState<string | null>(null)
 
   const targetKey = tag?.id ?? (open ? 'new' : null)
@@ -388,6 +396,7 @@ function TagModal({ open, tag, onClose }: { open: boolean; tag: Tag | null; onCl
     setName(tag?.name ?? '')
     setDescription(tag?.description ?? '')
     setIcon(tag?.icon ?? 'Package')
+    setAuto(tag?.auto ?? false)
   }
   if (!open && loadedFor !== null) setLoadedFor(null)
 
@@ -397,6 +406,7 @@ function TagModal({ open, tag, onClose }: { open: boolean; tag: Tag | null; onCl
       name: name.trim(),
       description: description.trim() || undefined,
       icon,
+      auto: auto || undefined,
     }
     dispatch(tag ? { type: 'updateTag', tag: saved } : { type: 'addTag', tag: saved })
     onClose()
@@ -430,6 +440,11 @@ function TagModal({ open, tag, onClose }: { open: boolean; tag: Tag | null; onCl
               </button>
             ))}
           </div>
+        </div>
+        <div>
+          <Chip active={auto} onClick={() => setAuto(!auto)}>
+            {auto ? 'Automatically added to every trip' : 'Add to every trip automatically?'}
+          </Chip>
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>

@@ -28,13 +28,42 @@ export const CONSUMABLE_IDS = new Set([
   'gaff-tape',
 ])
 
-export const seedItems: Item[] = rawSeedItems.map(i => ({
-  ...i,
-  kind: CONSUMABLE_IDS.has(i.id) ? 'consumable' : 'gear',
-}))
+/**
+ * Items that stay on Base when camping gear moves to Camp Basics: anything
+ * toiletries-tagged, plus these genuinely-universal ids.
+ */
+const UNIVERSAL_BASE_IDS = new Set(['sunscreen', 'neosporin-medications-allergy', 'power-bank-solar-panel'])
+
+/** Move camping-specific gear off the auto-applied Base list onto Camp Basics. */
+export function rehomeBaseTags(tags: string[], id: string): string[] {
+  if (!tags.includes('always')) return tags
+  if (tags.includes('toiletries') || UNIVERSAL_BASE_IDS.has(id)) return tags
+  return [...tags.filter(t => t !== 'always'), 'camping']
+}
+
+/** Clothing basics — the CSV had none; Base should cover clothes. */
+export const CLOTHING_ITEMS: Item[] = [
+  { id: 'underwear', name: 'Underwear', kind: 'gear', stock: null, tags: ['always'] },
+  { id: 'socks', name: 'Socks', kind: 'gear', stock: null, tags: ['always'] },
+  { id: 't-shirts', name: 'T-Shirts', kind: 'gear', stock: null, tags: ['always'] },
+  { id: 'pants-shorts', name: 'Pants / Shorts', kind: 'gear', stock: null, tags: ['always'] },
+  { id: 'warm-layer', name: 'Warm Layer', kind: 'gear', stock: null, tags: ['always'] },
+  { id: 'sleepwear', name: 'Sleepwear', kind: 'gear', stock: null, tags: ['always'] },
+  { id: 'phone-charger', name: 'Phone Charger', kind: 'gear', stock: null, tags: ['always'] },
+]
+
+export const seedItems: Item[] = [
+  ...rawSeedItems.map(i => ({
+    ...i,
+    kind: (CONSUMABLE_IDS.has(i.id) ? 'consumable' : 'gear') as Item['kind'],
+    tags: rehomeBaseTags(i.tags, i.id),
+  })),
+  ...CLOTHING_ITEMS,
+]
 
 export const seedTags: Tag[] = [
-  { id: 'always', name: 'Always', icon: 'Star', description: 'The core kit — comes on every trip' },
+  { id: 'always', name: 'Base', icon: 'Star', auto: true, description: 'Clothes, toiletries, and basics — goes on every trip' },
+  { id: 'camping', name: 'Camp Basics', icon: 'TreePine', description: 'Core camp gear for any campsite' },
   { id: 'toiletries', name: 'Toiletries', icon: 'Droplets', description: 'Hygiene and bathroom gear' },
   { id: 'festival', name: 'Festival', icon: 'PartyPopper', description: 'Festival camps — decor, shade, and crowd comforts' },
   { id: 'tent', name: 'Tent', icon: 'Tent', description: 'Sleeping in a tent' },
@@ -53,7 +82,7 @@ export const seedTags: Tag[] = [
 ]
 
 /** Bump when seed tags/cards are added so existing saves pick them up. */
-export const SEED_VERSION = 2
+export const SEED_VERSION = 3
 
 export const wizardSteps: WizardStep[] = [
   {
@@ -67,28 +96,28 @@ export const wizardSteps: WizardStep[] = [
         title: 'Car Camping',
         subtitle: 'Drive right up to the site — bring the comforts',
         icon: 'Car',
-        tags: ['always', 'toiletries', 'tent', 'car', 'kitchen', 'living'],
+        tags: ['camping', 'toiletries', 'tent', 'car', 'kitchen', 'living'],
       },
       {
         id: 'hike-in',
         title: 'Hike-In',
         subtitle: 'Carry it on your back — pack light, pack smart',
         icon: 'Mountain',
-        tags: ['always', 'toiletries', 'tent', 'survival'],
+        tags: ['camping', 'toiletries', 'tent', 'survival'],
       },
       {
         id: 'festival',
         title: 'Festival',
         subtitle: 'Music, decor, shade, and a good camp scene',
         icon: 'PartyPopper',
-        tags: ['always', 'toiletries', 'festival', 'living', 'car'],
+        tags: ['camping', 'toiletries', 'festival', 'living', 'car'],
       },
       {
         id: 'glamping',
         title: 'Glamping',
         subtitle: 'All the fancy comforts, none of the roughing it',
         icon: 'Sparkles',
-        tags: ['always', 'toiletries', 'glamping', 'kitchen', 'living'],
+        tags: ['camping', 'toiletries', 'glamping', 'kitchen', 'living'],
       },
       {
         id: 'lan-event',
