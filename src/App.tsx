@@ -5,6 +5,7 @@ import { PlanWizard } from './views/PlanWizard'
 import { TripsView } from './views/Trips'
 import { GearView } from './views/Gear'
 import { StylesView } from './views/Styles'
+import { AccountSection } from './components/Account'
 
 type View = 'plan' | 'trips' | 'gear' | 'styles'
 
@@ -60,6 +61,7 @@ export default function App() {
               </button>
             ))}
           </nav>
+          <AccountSection />
           <div className="hidden border-t border-white/5 px-5 py-4 text-[11px] leading-relaxed text-bark-600 md:block">
             Layered lists for every kind of trip.
           </div>

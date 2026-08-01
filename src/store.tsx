@@ -13,7 +13,7 @@ import {
 
 const CAMP_STYLE_CARD_IDS = new Set(['car-camping', 'hike-in', 'festival', 'glamping'])
 
-interface State {
+export interface State {
   items: Item[]
   tags: Tag[]
   trips: Trip[]
@@ -32,6 +32,7 @@ type Action =
   | { type: 'updateTrip'; trip: Trip }
   | { type: 'deleteTrip'; id: string }
   | { type: 'setWizard'; wizard: WizardStep[] }
+  | { type: 'hydrate'; state: State }
   | { type: 'resetData' }
 
 const STORAGE_KEY = 'triplist-v1'
@@ -39,10 +40,17 @@ const STORAGE_KEY = 'triplist-v1'
 function initialState(): State {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const state = JSON.parse(raw) as State
-      // migrate items saved before the gear/consumable split
-      state.items = state.items.map(i => ({
+    if (raw) return normalizeState(JSON.parse(raw) as State)
+  } catch {
+    // fall through to seed
+  }
+  return { items: seedItems, tags: seedTags, trips: [], wizard: wizardSteps, seedVersion: SEED_VERSION }
+}
+
+/** Upgrade a stored state doc (localStorage or server copy) to the current shape. */
+export function normalizeState(state: State): State {
+  // migrate items saved before the gear/consumable split
+  state.items = state.items.map(i => ({
         ...i,
         kind: i.kind ?? (CONSUMABLE_IDS.has(i.id) ? 'consumable' : 'gear'),
       }))
@@ -89,11 +97,6 @@ function initialState(): State {
         state.seedVersion = SEED_VERSION
       }
       return state
-    }
-  } catch {
-    // fall through to seed
-  }
-  return { items: seedItems, tags: seedTags, trips: [], wizard: wizardSteps, seedVersion: SEED_VERSION }
 }
 
 function reducer(state: State, action: Action): State {
@@ -135,6 +138,8 @@ function reducer(state: State, action: Action): State {
       return { ...state, trips: state.trips.filter(t => t.id !== action.id) }
     case 'setWizard':
       return { ...state, wizard: action.wizard }
+    case 'hydrate':
+      return normalizeState(action.state)
     case 'resetData':
       return { items: seedItems, tags: seedTags, trips: [], wizard: wizardSteps, seedVersion: SEED_VERSION }
   }

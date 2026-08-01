@@ -10,6 +10,7 @@
     "start": "node server/index.mjs"
   },
   "dependencies": {
+    "better-auth": "^1.6.25",
     "express": "^5.2.1",
     "framer-motion": "^11.11.9",
     "lucide-react": "^0.462.0",
