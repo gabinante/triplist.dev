@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Backpack, Check, HeartHandshake, ListChecks, Map, Shapes, TentTree } from 'lucide-react'
-import { StoreProvider } from './store'
+import { StoreProvider, useStore } from './store'
 import { PlanWizard } from './views/PlanWizard'
 import { TripsView } from './views/Trips'
 import { GearView } from './views/Gear'
@@ -9,6 +9,7 @@ import { StylesView } from './views/Styles'
 import { FriendsView } from './views/Friends'
 import { AccountSection } from './components/Account'
 import { AuthModal } from './components/AuthModal'
+import { Welcome } from './components/Welcome'
 import { claimShare, useInbox } from './lib/shares'
 import { useFriends } from './lib/friends'
 import { useSession } from './lib/auth-client'
@@ -24,6 +25,24 @@ const NAV: { id: View; label: string; icon: typeof Map }[] = [
   { id: 'styles', label: 'Trip Styles', icon: Shapes },
   { id: 'friends', label: 'Friends & Family', icon: HeartHandshake },
 ]
+
+const WELCOMED_KEY = 'triplist-welcomed'
+
+function WelcomeGate() {
+  const { state } = useStore()
+  // Only greet genuinely new users; anyone with trips predates the welcome.
+  const [open, setOpen] = useState(
+    () => !localStorage.getItem(WELCOMED_KEY) && state.trips.length === 0,
+  )
+  useEffect(() => {
+    if (!open && !localStorage.getItem(WELCOMED_KEY)) localStorage.setItem(WELCOMED_KEY, '1')
+  }, [open])
+  const close = () => {
+    localStorage.setItem(WELCOMED_KEY, '1')
+    setOpen(false)
+  }
+  return <Welcome open={open} onClose={close} />
+}
 
 export default function App() {
   const [view, setView] = useState<View>('plan')
@@ -145,6 +164,7 @@ export default function App() {
           initialMode="reset"
           resetToken={resetToken}
         />
+        <WelcomeGate />
         <AnimatePresence>
           {verifiedToast && (
             <motion.div

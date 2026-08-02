@@ -1,5 +1,7 @@
 export type ItemKind = 'gear' | 'consumable' | 'meal'
 
+export type WeightUnit = 'g' | 'kg' | 'oz' | 'lb'
+
 export interface Item {
   id: string
   name: string
@@ -9,6 +11,9 @@ export interface Item {
   tags: string[]
   /** Meals are mini lists — these get checked off individually on trips. */
   ingredients?: string[]
+  /** Optional, in `weightUnit` units (grams when unset). */
+  weight?: number
+  weightUnit?: WeightUnit
 }
 
 export interface Tag {

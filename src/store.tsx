@@ -46,6 +46,7 @@ type Action =
   | { type: 'hydrate'; state: State }
   | { type: 'importTrip'; trip: Trip; items: Item[]; tags: Tag[] }
   | { type: 'importList'; tag: Tag; items: Item[] }
+  | { type: 'startBlank' }
   | { type: 'resetData' }
 
 const STORAGE_KEY = 'triplist-v1'
@@ -278,6 +279,14 @@ function reducer(state: State, action: Action): State {
         items: [...items, ...action.items.filter(inc => !state.items.some(i => i.id === inc.id))],
       }
     }
+    case 'startBlank':
+      // First-run choice: keep the lists and trip cards as structure, clear
+      // the sample gear — tombstoned so migrations never bring it back.
+      return {
+        ...state,
+        items: [],
+        removed: addTombstones(state.removed, state.items.map(i => i.id)),
+      }
     case 'resetData':
       return { items: seedItems, tags: seedTags, trips: [], wizard: wizardSteps, seedVersion: SEED_VERSION, removed: [] }
   }
