@@ -16,12 +16,20 @@ import {
 
 const CAMP_STYLE_CARD_IDS = new Set(['car-camping', 'hike-in', 'festival', 'glamping'])
 
+const addTombstones = (removed: string[] | undefined, ids: string[]): string[] =>
+  [...new Set([...(removed ?? []), ...ids])]
+
 export interface State {
   items: Item[]
   tags: Tag[]
   trips: Trip[]
   wizard: WizardStep[]
   seedVersion?: number
+  /**
+   * Tombstones: ids of items/lists/cards the user deleted. Seed migrations
+   * check this so bumping the seed version never resurrects deletions.
+   */
+  removed?: string[]
 }
 
 type Action =
@@ -49,7 +57,7 @@ function initialState(): State {
   } catch {
     // fall through to seed
   }
-  return { items: seedItems, tags: seedTags, trips: [], wizard: wizardSteps, seedVersion: SEED_VERSION }
+  return { items: seedItems, tags: seedTags, trips: [], wizard: wizardSteps, seedVersion: SEED_VERSION, removed: [] }
 }
 
 /** Upgrade a stored state doc (localStorage or server copy) to the current shape. */
@@ -64,12 +72,18 @@ export function normalizeState(state: State): State {
       // pull in seed tags/cards added since this save was created, without
       // resurrecting anything the user has since deleted or edited
       const from = state.seedVersion ?? 1
+      const removed = new Set(state.removed ?? [])
       if (from < SEED_VERSION) {
-        state.tags = [...state.tags, ...seedTags.filter(t => !state.tags.some(s => s.id === t.id))]
+        state.tags = [
+          ...state.tags,
+          ...seedTags.filter(t => !state.tags.some(s => s.id === t.id) && !removed.has(t.id)),
+        ]
         state.wizard = state.wizard.map(step => {
           const seedStep = wizardSteps.find(s => s.id === step.id)
           if (!seedStep) return step
-          const newCards = seedStep.cards.filter(c => !step.cards.some(x => x.id === c.id))
+          const newCards = seedStep.cards.filter(
+            c => !step.cards.some(x => x.id === c.id) && !removed.has(c.id),
+          )
           return { ...step, title: seedStep.title, prompt: seedStep.prompt, cards: [...step.cards, ...newCards] }
         })
         if (from < 3) {
@@ -88,7 +102,7 @@ export function normalizeState(state: State): State {
           )
           state.items = [
             ...state.items.map(i => ({ ...i, tags: rehomeBaseTags(i.tags, i.id) })),
-            ...CLOTHING_ITEMS.filter(c => !state.items.some(i => i.id === c.id)),
+            ...CLOTHING_ITEMS.filter(c => !state.items.some(i => i.id === c.id) && !removed.has(c.id)),
           ]
           state.wizard = state.wizard.map(step => ({
             ...step,
@@ -113,7 +127,7 @@ export function normalizeState(state: State): State {
           // water jug / solar panel from Base (they're camp gear)
           state.items = [
             ...state.items.map(i => (BASE_EXCLUDED_IDS.has(i.id) ? { ...i, tags: rehomeBaseTags(i.tags, i.id) } : i)),
-            ...STARTER_LIST_ITEMS.filter(s => !state.items.some(i => i.id === s.id)),
+            ...STARTER_LIST_ITEMS.filter(s => !state.items.some(i => i.id === s.id) && !removed.has(s.id)),
           ]
         }
         if (from < 8) {
@@ -147,7 +161,7 @@ export function normalizeState(state: State): State {
           }
           state.items = [
             ...state.items,
-            ...MEAL_ITEMS.filter(m => !state.items.some(i => i.id === m.id)),
+            ...MEAL_ITEMS.filter(m => !state.items.some(i => i.id === m.id) && !removed.has(m.id)),
           ]
         }
         state.seedVersion = SEED_VERSION
@@ -177,6 +191,7 @@ export function mergeStates(server: State, local: State): State {
     trips: unionById(server.trips, local.trips),
     wizard: [...wizard, ...localOnlySteps],
     seedVersion: Math.max(server.seedVersion ?? 1, local.seedVersion ?? 1),
+    removed: [...new Set([...(server.removed ?? []), ...(local.removed ?? [])])],
   })
 }
 
@@ -189,6 +204,7 @@ function reducer(state: State, action: Action): State {
     case 'deleteItem':
       return {
         ...state,
+        removed: addTombstones(state.removed, [action.id]),
         items: state.items.filter(i => i.id !== action.id),
         trips: state.trips.map(t => ({
           ...t,
@@ -203,6 +219,7 @@ function reducer(state: State, action: Action): State {
     case 'deleteTag':
       return {
         ...state,
+        removed: addTombstones(state.removed, [action.id]),
         tags: state.tags.filter(t => t.id !== action.id),
         items: state.items.map(i => ({ ...i, tags: i.tags.filter(id => id !== action.id) })),
         trips: state.trips.map(t => ({ ...t, tagIds: t.tagIds.filter(id => id !== action.id) })),
@@ -217,8 +234,15 @@ function reducer(state: State, action: Action): State {
       return { ...state, trips: state.trips.map(t => (t.id === action.trip.id ? action.trip : t)) }
     case 'deleteTrip':
       return { ...state, trips: state.trips.filter(t => t.id !== action.id) }
-    case 'setWizard':
-      return { ...state, wizard: action.wizard }
+    case 'setWizard': {
+      const before = new Set(state.wizard.flatMap(s2 => s2.cards.map(c => c.id)))
+      for (const s2 of action.wizard) for (const c of s2.cards) before.delete(c.id)
+      return {
+        ...state,
+        removed: before.size > 0 ? addTombstones(state.removed, [...before]) : state.removed,
+        wizard: action.wizard,
+      }
+    }
     case 'hydrate':
       return normalizeState(action.state)
     case 'importTrip': {
@@ -255,7 +279,7 @@ function reducer(state: State, action: Action): State {
       }
     }
     case 'resetData':
-      return { items: seedItems, tags: seedTags, trips: [], wizard: wizardSteps, seedVersion: SEED_VERSION }
+      return { items: seedItems, tags: seedTags, trips: [], wizard: wizardSteps, seedVersion: SEED_VERSION, removed: [] }
   }
 }
 
