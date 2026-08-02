@@ -124,7 +124,7 @@ export const seedTags: Tag[] = [
 ]
 
 /** Bump when seed tags/cards are added so existing saves pick them up. */
-export const SEED_VERSION = 7
+export const SEED_VERSION = 8
 
 export const wizardSteps: WizardStep[] = [
   {
@@ -177,9 +177,9 @@ export const wizardSteps: WizardStep[] = [
       },
       {
         id: 'weekend-getaway',
-        title: 'Weekend Getaway',
-        subtitle: 'Two nights, light bags, big reset',
-        icon: 'Sun',
+        title: 'Hotel Vacation',
+        subtitle: 'Check in, unpack, unwind',
+        icon: 'Building2',
         tags: ['toiletries', 'hotel'],
       },
       {

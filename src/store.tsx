@@ -116,6 +116,17 @@ export function normalizeState(state: State): State {
             ...STARTER_LIST_ITEMS.filter(s => !state.items.some(i => i.id === s.id)),
           ]
         }
+        if (from < 8) {
+          // v8: Weekend Getaway became Hotel Vacation (skip if user renamed it)
+          state.wizard = state.wizard.map(step => ({
+            ...step,
+            cards: step.cards.map(c =>
+              c.id === 'weekend-getaway' && c.title === 'Weekend Getaway'
+                ? { ...c, title: 'Hotel Vacation', subtitle: 'Check in, unpack, unwind', icon: 'Building2' }
+                : c,
+            ),
+          }))
+        }
         if (from < 7) {
           // v7: seed meals gained ingredients — backfill any the user hasn't customized
           state.items = state.items.map(i => {
