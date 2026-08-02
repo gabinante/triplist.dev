@@ -19,6 +19,38 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
   const step = steps[stepIndex]
   const autoLists = useMemo(() => state.tags.filter(t => t.auto), [state.tags])
 
+  // How many cards (across all steps) apply each list — used to rank how
+  // distinctive an item is to a given card.
+  const cardsPerTag = useMemo(() => {
+    const freq = new Map<string, number>()
+    for (const s of steps)
+      for (const c of s.cards)
+        for (const t of c.tags) freq.set(t, (freq.get(t) ?? 0) + 1)
+    return freq
+  }, [steps])
+
+  const signatureItems = useMemo(() => {
+    const result = new Map<string, string[]>()
+    for (const s of steps) {
+      for (const c of s.cards) {
+        const scored = state.items
+          .map(item => {
+            const overlap = item.tags.filter(t => c.tags.includes(t))
+            if (overlap.length === 0) return null
+            return {
+              name: item.name,
+              score: Math.min(...overlap.map(t => cardsPerTag.get(t) ?? 99)),
+              tie: item.tags.length,
+            }
+          })
+          .filter((x): x is { name: string; score: number; tie: number } => x !== null)
+          .sort((a, b) => a.score - b.score || a.tie - b.tie)
+        result.set(c.id, scored.slice(0, 3).map(x => x.name))
+      }
+    }
+    return result
+  }, [steps, state.items, cardsPerTag])
+
   const chosenTags = useMemo(() => {
     const tags = new Set<string>(autoLists.map(t => t.id))
     for (const s of steps) {
@@ -161,7 +193,21 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
                         )}
                       </div>
                       <h3 className="mt-3 font-semibold text-bark-50">{card.title}</h3>
-                      <p className="mt-1 text-sm text-bark-400">{card.subtitle}</p>
+                      {(signatureItems.get(card.id)?.length ?? 0) > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {signatureItems.get(card.id)!.map(name => (
+                            <span
+                              key={name}
+                              className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-bark-300"
+                            >
+                              {name}
+                            </span>
+                          ))}
+                          <span className="rounded-full px-1 py-0.5 text-[11px] text-bark-500">…</span>
+                        </div>
+                      ) : (
+                        <p className="mt-1 text-sm text-bark-400">{card.subtitle}</p>
+                      )}
                     </button>
                   )
                 })}
