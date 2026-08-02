@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Backpack, Check, HeartHandshake, Map, Shapes, TentTree } from 'lucide-react'
+import { Backpack, Check, HeartHandshake, ListChecks, Map, Shapes, TentTree } from 'lucide-react'
 import { StoreProvider } from './store'
 import { PlanWizard } from './views/PlanWizard'
 import { TripsView } from './views/Trips'
 import { GearView } from './views/Gear'
+import { ListsView } from './views/Lists'
 import { StylesView } from './views/Styles'
 import { FriendsView } from './views/Friends'
 import { AccountSection } from './components/Account'
@@ -13,12 +14,13 @@ import { useFriends } from './lib/friends'
 import { useSession } from './lib/auth-client'
 import { AnimatePresence, motion } from 'framer-motion'
 
-type View = 'plan' | 'trips' | 'gear' | 'styles' | 'friends'
+type View = 'plan' | 'trips' | 'gear' | 'lists' | 'styles' | 'friends'
 
 const NAV: { id: View; label: string; icon: typeof Map }[] = [
   { id: 'plan', label: 'Plan My Trip', icon: Map },
   { id: 'trips', label: 'My Trips', icon: TentTree },
-  { id: 'gear', label: 'Gear & Lists', icon: Backpack },
+  { id: 'gear', label: 'Gear', icon: Backpack },
+  { id: 'lists', label: 'Lists', icon: ListChecks },
   { id: 'styles', label: 'Trip Styles', icon: Shapes },
   { id: 'friends', label: 'Friends & Family', icon: HeartHandshake },
 ]
@@ -133,6 +135,7 @@ export default function App() {
             />
           )}
           {view === 'gear' && <GearView />}
+          {view === 'lists' && <ListsView />}
           {view === 'styles' && <StylesView />}
           {view === 'friends' && <FriendsView data={friends} onChange={friends.refresh} />}
         </main>

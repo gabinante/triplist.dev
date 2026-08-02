@@ -5,6 +5,7 @@ import {
   BASE_EXCLUDED_IDS,
   CLOTHING_ITEMS,
   CONSUMABLE_IDS,
+  MEAL_ITEMS,
   SEED_VERSION,
   STARTER_LIST_ITEMS,
   rehomeBaseTags,
@@ -113,6 +114,21 @@ export function normalizeState(state: State): State {
           state.items = [
             ...state.items.map(i => (BASE_EXCLUDED_IDS.has(i.id) ? { ...i, tags: rehomeBaseTags(i.tags, i.id) } : i)),
             ...STARTER_LIST_ITEMS.filter(s => !state.items.some(i => i.id === s.id)),
+          ]
+        }
+        if (from < 6) {
+          // v6: meal prep — insert the conditional meals step before Crew
+          // and seed the starter menu items
+          if (!state.wizard.some(s => s.id === 'meals')) {
+            const mealsStep = wizardSteps.find(s => s.id === 'meals')
+            if (mealsStep) {
+              const crewIdx = state.wizard.findIndex(s => s.id === 'crew')
+              state.wizard.splice(crewIdx === -1 ? state.wizard.length : crewIdx, 0, mealsStep)
+            }
+          }
+          state.items = [
+            ...state.items,
+            ...MEAL_ITEMS.filter(m => !state.items.some(i => i.id === m.id)),
           ]
         }
         state.seedVersion = SEED_VERSION

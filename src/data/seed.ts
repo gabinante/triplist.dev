@@ -75,6 +75,20 @@ export const STARTER_LIST_ITEMS: Item[] = [
   { id: 'serving-utensils', name: 'Serving Utensils', kind: 'gear', stock: null, tags: ['group', 'kitchen'] },
 ]
 
+/** Menu-planning starters for the meal prep step (seed v6). */
+export const MEAL_ITEMS: Item[] = [
+  { id: 'pancake-breakfast', name: 'Pancake Breakfast', kind: 'meal', stock: null, tags: ['meals'] },
+  { id: 'breakfast-burritos', name: 'Breakfast Burritos', kind: 'meal', stock: null, tags: ['meals'] },
+  { id: 'chili-night', name: 'Chili Night', kind: 'meal', stock: null, tags: ['meals'] },
+  { id: 'hot-dogs-burgers', name: 'Hot Dogs & Burgers', kind: 'meal', stock: null, tags: ['meals'] },
+  { id: 'foil-packet-dinners', name: 'Foil Packet Dinners', kind: 'meal', stock: null, tags: ['meals', 'fire'] },
+  { id: 'coffee-cocoa', name: 'Coffee & Cocoa', kind: 'meal', stock: null, tags: ['meals'] },
+  { id: 'smores-kit', name: "S'mores Kit", kind: 'meal', stock: null, tags: ['snacks', 'fire'] },
+  { id: 'sandwiches-wraps', name: 'Sandwiches & Wraps', kind: 'meal', stock: null, tags: ['snacks'] },
+  { id: 'trail-snacks', name: 'Trail Snacks', kind: 'meal', stock: null, tags: ['snacks'] },
+  { id: 'fruit-veggies', name: 'Fruit & Veggies', kind: 'meal', stock: null, tags: ['snacks'] },
+]
+
 export const seedItems: Item[] = [
   ...rawSeedItems.map(i => ({
     ...i,
@@ -83,6 +97,7 @@ export const seedItems: Item[] = [
   })),
   ...CLOTHING_ITEMS,
   ...STARTER_LIST_ITEMS,
+  ...MEAL_ITEMS,
 ]
 
 export const seedTags: Tag[] = [
@@ -104,10 +119,12 @@ export const seedTags: Tag[] = [
   { id: 'business', name: 'Business', icon: 'Briefcase', description: 'Work travel — laptop, chargers, presentable clothes' },
   { id: 'hotel', name: 'Hotel', icon: 'Building2', description: 'Hotel stays — day bag, chargers, dopp kit' },
   { id: 'all-inclusive', name: 'All-Inclusive', icon: 'Ship', description: 'Cruises & resorts — documents, swimwear, sea-sickness meds' },
+  { id: 'meals', name: 'Meals', icon: 'Utensils', description: 'Cooked meals and menu planning' },
+  { id: 'snacks', name: 'Snacks', icon: 'Sandwich', description: 'No-cook food and easy eats' },
 ]
 
 /** Bump when seed tags/cards are added so existing saves pick them up. */
-export const SEED_VERSION = 5
+export const SEED_VERSION = 6
 
 export const wizardSteps: WizardStep[] = [
   {
@@ -157,6 +174,20 @@ export const wizardSteps: WizardStep[] = [
         subtitle: 'Work travel — pack light and presentable',
         icon: 'Briefcase',
         tags: ['business', 'toiletries'],
+      },
+      {
+        id: 'weekend-getaway',
+        title: 'Weekend Getaway',
+        subtitle: 'Two nights, light bags, big reset',
+        icon: 'Sun',
+        tags: ['toiletries', 'hotel'],
+      },
+      {
+        id: 'road-trip',
+        title: 'Road Trip',
+        subtitle: 'Miles of highway and good snacks',
+        icon: 'MapPin',
+        tags: ['car', 'snacks', 'toiletries'],
       },
       {
         id: 'cruise',
@@ -215,6 +246,30 @@ export const wizardSteps: WizardStep[] = [
         subtitle: 'Cruise ship or resort — they handle the rest',
         icon: 'Ship',
         tags: ['all-inclusive'],
+      },
+    ],
+  },
+  {
+    id: 'meals',
+    title: 'Meal prep',
+    prompt: "What's cooking?",
+    multi: true,
+    optional: true,
+    requiresTag: 'kitchen',
+    cards: [
+      {
+        id: 'cooked-meals',
+        title: 'Camp Cooking',
+        subtitle: 'Real meals on the stove or fire',
+        icon: 'CookingPot',
+        tags: ['meals'],
+      },
+      {
+        id: 'easy-eats',
+        title: 'Snacks & Easy Eats',
+        subtitle: 'No-cook food for the cooler',
+        icon: 'Sandwich',
+        tags: ['snacks'],
       },
     ],
   },

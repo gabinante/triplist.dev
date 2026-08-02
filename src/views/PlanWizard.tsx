@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Check, Compass, Plus } from 'lucide-react'
 import { makeId, tripItems, useStore } from '../store'
-import type { Trip } from '../types'
+import type { Trip, WizardStep } from '../types'
 import { Button, Chip, DynamicIcon, GlassPanel, inputClass } from '../components/ui'
 import { CardEditor } from '../components/CardEditor'
 
@@ -14,24 +14,22 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
   const [date, setDate] = useState('')
   const [creatingCard, setCreatingCard] = useState(false)
 
-  const steps = state.wizard
-  const finalStep = stepIndex === steps.length
-  const step = steps[stepIndex]
+  const allSteps = state.wizard
   const autoLists = useMemo(() => state.tags.filter(t => t.auto), [state.tags])
 
   // How many cards (across all steps) apply each list — used to rank how
   // distinctive an item is to a given card.
   const cardsPerTag = useMemo(() => {
     const freq = new Map<string, number>()
-    for (const s of steps)
+    for (const s of allSteps)
       for (const c of s.cards)
         for (const t of c.tags) freq.set(t, (freq.get(t) ?? 0) + 1)
     return freq
-  }, [steps])
+  }, [allSteps])
 
   const signatureItems = useMemo(() => {
     const result = new Map<string, string[]>()
-    for (const s of steps) {
+    for (const s of allSteps) {
       for (const c of s.cards) {
         const scored = state.items
           .map(item => {
@@ -49,18 +47,28 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
       }
     }
     return result
-  }, [steps, state.items, cardsPerTag])
+  }, [allSteps, state.items, cardsPerTag])
 
-  const chosenTags = useMemo(() => {
+  // Walk steps in order, accumulating lists; a step with requiresTag only
+  // becomes visible (and only contributes its picks) once an earlier choice
+  // granted that list — e.g. Meal prep appears when Kitchen is in play.
+  const { chosenTags, steps } = useMemo(() => {
     const tags = new Set<string>(autoLists.map(t => t.id))
-    for (const s of steps) {
+    const visible: WizardStep[] = []
+    for (const s of allSteps) {
+      if (s.requiresTag && !tags.has(s.requiresTag)) continue
+      visible.push(s)
       for (const cardId of picks[s.id] ?? []) {
         const card = s.cards.find(c => c.id === cardId)
         card?.tags.forEach(t => tags.add(t))
       }
     }
-    return [...tags]
-  }, [picks, steps, autoLists])
+    return { chosenTags: [...tags], steps: visible }
+  }, [picks, allSteps, autoLists])
+
+  const boundedIndex = Math.min(stepIndex, steps.length)
+  const finalStep = boundedIndex === steps.length
+  const step = steps[boundedIndex]
 
   const previewTrip: Trip = useMemo(
     () => ({
@@ -115,7 +123,7 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
           <div
             key={id}
             className={`h-1.5 rounded-full transition-all duration-300 ${
-              i === stepIndex ? 'w-8 bg-moss-400' : i < stepIndex ? 'w-4 bg-moss-600' : 'w-4 bg-white/10'
+              i === boundedIndex ? 'w-8 bg-moss-400' : i < boundedIndex ? 'w-4 bg-moss-600' : 'w-4 bg-white/10'
             }`}
           />
         ))}
@@ -123,7 +131,7 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
 
       <AnimatePresence mode="wait">
         <motion.div
-          key={stepIndex}
+          key={step?.id ?? "details"}
           initial={{ opacity: 0, x: 24 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -24 }}
@@ -285,7 +293,7 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
       </AnimatePresence>
 
       <div className="mt-8 flex items-center justify-between">
-        <Button variant="ghost" onClick={() => setStepIndex(stepIndex - 1)} className={stepIndex === 0 ? 'invisible' : ''}>
+        <Button variant="ghost" onClick={() => setStepIndex(boundedIndex - 1)} className={boundedIndex === 0 ? 'invisible' : ''}>
           <span className="flex items-center gap-1.5">
             <ArrowLeft className="h-4 w-4" /> Back
           </span>
@@ -305,7 +313,7 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
             </span>
           </Button>
         ) : (
-          <Button onClick={() => setStepIndex(stepIndex + 1)} disabled={!canAdvance}>
+          <Button onClick={() => setStepIndex(boundedIndex + 1)} disabled={!canAdvance}>
             <span className="flex items-center gap-1.5">
               Next <ArrowRight className="h-4 w-4" />
             </span>

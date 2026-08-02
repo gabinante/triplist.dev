@@ -29,6 +29,8 @@ const GROUP_ORDER = [
   'toiletries',
   'camping',
   'kitchen',
+  'meals',
+  'snacks',
   'living',
   'tent',
   'survival',
@@ -698,9 +700,10 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
             </div>
             <div>
               <label className="mb-1.5 block text-xs font-medium text-bark-400">Type</label>
-              <div className="flex gap-1.5 pt-1">
+              <div className="flex flex-wrap gap-1.5 pt-1">
                 <Chip active={newKind === 'gear'} onClick={() => setNewKind('gear')}>Gear</Chip>
                 <Chip active={newKind === 'consumable'} onClick={() => setNewKind('consumable')}>Consumable</Chip>
+                <Chip active={newKind === 'meal'} onClick={() => setNewKind('meal')}>Meal</Chip>
               </div>
             </div>
           </div>

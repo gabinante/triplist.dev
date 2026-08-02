@@ -1,4 +1,4 @@
-export type ItemKind = 'gear' | 'consumable'
+export type ItemKind = 'gear' | 'consumable' | 'meal'
 
 export interface Item {
   id: string
@@ -43,5 +43,7 @@ export interface WizardStep {
   prompt: string
   multi: boolean
   optional?: boolean
+  /** Only shown when the trip's lists (so far) include this list. */
+  requiresTag?: string
   cards: WizardCard[]
 }
