@@ -13,9 +13,10 @@ import {
   Tent,
   Trash2,
 } from 'lucide-react'
-import { makeId, tripItems, tripProgress, useStore } from '../store'
+import { ingredientKey, isItemPacked, makeId, tripItems, tripProgress, useStore } from '../store'
 import type { Item, ItemKind, Trip } from '../types'
 import { Button, Chip, DynamicIcon, GlassPanel, Modal, ProgressRing, inputClass } from '../components/ui'
+import { IngredientsEditor } from '../components/IngredientsEditor'
 import { useAuthAvailable, useSession } from '../lib/auth-client'
 import { AuthModal } from '../components/AuthModal'
 import { ShareModal } from '../components/ShareModal'
@@ -396,8 +397,16 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
 
   const update = (patch: Partial<Trip>) => dispatch({ type: 'updateTrip', trip: { ...trip, ...patch } })
 
-  const togglePacked = (itemId: string) =>
-    update({ packed: { ...trip.packed, [itemId]: !trip.packed[itemId] } })
+  const togglePacked = (item: Item) => {
+    if (item.kind === 'meal' && item.ingredients?.length) {
+      const packedAll = isItemPacked(trip, item)
+      const patch = { ...trip.packed }
+      for (const ing of item.ingredients) patch[ingredientKey(item.id, ing)] = !packedAll
+      update({ packed: patch })
+    } else {
+      update({ packed: { ...trip.packed, [item.id]: !trip.packed[item.id] } })
+    }
+  }
 
   const removeItem = (itemId: string) =>
     update({
@@ -479,7 +488,15 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
           </Button>
           <Button
             variant="ghost"
-            onClick={() => update({ packed: Object.fromEntries(list.map(i => [i.id, true])) })}
+            onClick={() => {
+              const entries: Record<string, boolean> = {}
+              for (const i of list) {
+                if (i.kind === 'meal' && i.ingredients?.length)
+                  for (const ing of i.ingredients) entries[ingredientKey(i.id, ing)] = true
+                else entries[i.id] = true
+              }
+              update({ packed: entries })
+            }}
           >
             <span className="flex items-center gap-1.5">
               <CheckCheck className="h-4 w-4" /> Pack all
@@ -519,8 +536,14 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                   heading: state.tags.find(t => t.id === groupTag)?.name ?? 'Other',
                   items: items.map(i => ({
                     name: i.name,
-                    checked: !!trip.packed[i.id],
+                    checked: isItemPacked(trip, i),
                     qty: i.stock,
+                    subItems: i.kind === 'meal'
+                      ? i.ingredients?.map(ing => ({
+                          name: ing,
+                          checked: !!trip.packed[ingredientKey(i.id, ing)],
+                        }))
+                      : undefined,
                   })),
                 })),
               })
@@ -536,7 +559,7 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
       <div className="space-y-5">
         {groups.map(([groupTag, items]) => {
           const tag = state.tags.find(t => t.id === groupTag)
-          const groupPacked = items.filter(i => trip.packed[i.id]).length
+          const groupPacked = items.filter(i => isItemPacked(trip, i)).length
           return (
             <div key={groupTag}>
               <div className="mb-2 flex items-center gap-2 px-1">
@@ -550,11 +573,11 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
               </div>
               <GlassPanel className="divide-y divide-white/5 overflow-hidden">
                 {items.map(item => {
-                  const isPacked = !!trip.packed[item.id]
+                  const isPacked = isItemPacked(trip, item)
                   return (
+                    <div key={item.id}>
                     <div
-                      key={item.id}
-                      onClick={() => togglePacked(item.id)}
+                      onClick={() => togglePacked(item)}
                       className="group flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.04]"
                     >
                       <span
@@ -595,6 +618,30 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                         <Minus className="h-4 w-4" />
                       </button>
                     </div>
+                    {item.kind === 'meal' &&
+                      item.ingredients?.map(ing => {
+                        const key = ingredientKey(item.id, ing)
+                        const on = !!trip.packed[key]
+                        return (
+                          <div
+                            key={key}
+                            onClick={() => update({ packed: { ...trip.packed, [key]: !on } })}
+                            className="flex cursor-pointer items-center gap-2.5 py-1.5 pl-12 pr-4 transition-colors hover:bg-white/[0.04]"
+                          >
+                            <span
+                              className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-all ${
+                                on ? 'border-moss-400 bg-moss-500/70 text-bark-950' : 'border-white/20 bg-white/5'
+                              }`}
+                            >
+                              {on && <Check className="h-3 w-3" />}
+                            </span>
+                            <span className={`text-[13px] ${on ? 'text-bark-500 line-through' : 'text-bark-300'}`}>
+                              {ing}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
                   )
                 })}
               </GlassPanel>
@@ -629,6 +676,7 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
   const [newName, setNewName] = useState('')
   const [newKind, setNewKind] = useState<ItemKind>('gear')
   const [newTags, setNewTags] = useState<string[]>([])
+  const [newIngredients, setNewIngredients] = useState<string[]>([])
   const [newListName, setNewListName] = useState<string | null>(null)
 
   const createList = () => {
@@ -659,6 +707,7 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
     setNewName(query.trim())
     setNewKind('gear')
     setNewTags([])
+    setNewIngredients([])
     setCreating(true)
   }
 
@@ -669,6 +718,7 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
       kind: newKind,
       stock: null,
       tags: newTags,
+      ingredients: newKind === 'meal' && newIngredients.length > 0 ? newIngredients : undefined,
     }
     dispatch({ type: 'addItem', item })
     add(item.id)
@@ -707,6 +757,7 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
               </div>
             </div>
           </div>
+          {newKind === 'meal' && <IngredientsEditor value={newIngredients} onChange={setNewIngredients} />}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-bark-400">
               Add to lists — it'll be packed under the first one

@@ -116,6 +116,14 @@ export function normalizeState(state: State): State {
             ...STARTER_LIST_ITEMS.filter(s => !state.items.some(i => i.id === s.id)),
           ]
         }
+        if (from < 7) {
+          // v7: seed meals gained ingredients — backfill any the user hasn't customized
+          state.items = state.items.map(i => {
+            if (i.kind !== 'meal' || i.ingredients?.length) return i
+            const seeded = MEAL_ITEMS.find(m => m.id === i.id)
+            return seeded?.ingredients ? { ...i, ingredients: seeded.ingredients } : i
+          })
+        }
         if (from < 6) {
           // v6: meal prep — insert the conditional meals step before Crew
           // and seed the starter menu items
@@ -267,9 +275,21 @@ export function tripItems(trip: Trip, items: Item[]): Item[] {
   )
 }
 
+/** Packing key for a single ingredient of a meal. */
+export function ingredientKey(itemId: string, ingredient: string): string {
+  return `${itemId}::${ingredient}`
+}
+
+/** Meals with ingredients are packed when every ingredient is checked. */
+export function isItemPacked(trip: Trip, item: Item): boolean {
+  if (item.kind === 'meal' && item.ingredients?.length)
+    return item.ingredients.every(ing => trip.packed[ingredientKey(item.id, ing)])
+  return !!trip.packed[item.id]
+}
+
 export function tripProgress(trip: Trip, items: Item[]): { packed: number; total: number } {
   const list = tripItems(trip, items)
-  return { packed: list.filter(i => trip.packed[i.id]).length, total: list.length }
+  return { packed: list.filter(i => isItemPacked(trip, i)).length, total: list.length }
 }
 
 export function makeId(name: string): string {

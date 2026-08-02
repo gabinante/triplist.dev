@@ -5,6 +5,8 @@ export interface PrintItem {
   name: string
   checked?: boolean
   qty?: number | null
+  /** e.g. a meal's ingredients — printed as an indented mini-checklist */
+  subItems?: { name: string; checked?: boolean }[]
 }
 
 export interface PrintSheetData {
@@ -44,10 +46,22 @@ export function PrintSheet({ sheet, onDone }: { sheet: PrintSheetData | null; on
           <h2>{group.heading}</h2>
           <ul>
             {group.items.map(item => (
-              <li key={item.name}>
-                <span className={`print-box${item.checked ? ' print-box-checked' : ''}`} />
-                <span className="print-name">{item.name}</span>
-                {item.qty != null && item.qty > 1 && <span className="print-qty">×{item.qty}</span>}
+              <li key={item.name} className={item.subItems?.length ? 'print-has-sub' : undefined}>
+                <div className="print-row">
+                  <span className={`print-box${item.checked ? ' print-box-checked' : ''}`} />
+                  <span className="print-name">{item.name}</span>
+                  {item.qty != null && item.qty > 1 && <span className="print-qty">×{item.qty}</span>}
+                </div>
+                {item.subItems && (
+                  <ul className="print-sub">
+                    {item.subItems.map(sub => (
+                      <li key={sub.name}>
+                        <span className={`print-box print-box-sm${sub.checked ? ' print-box-checked' : ''}`} />
+                        <span className="print-name">{sub.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ul>

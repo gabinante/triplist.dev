@@ -77,16 +77,16 @@ export const STARTER_LIST_ITEMS: Item[] = [
 
 /** Menu-planning starters for the meal prep step (seed v6). */
 export const MEAL_ITEMS: Item[] = [
-  { id: 'pancake-breakfast', name: 'Pancake Breakfast', kind: 'meal', stock: null, tags: ['meals'] },
-  { id: 'breakfast-burritos', name: 'Breakfast Burritos', kind: 'meal', stock: null, tags: ['meals'] },
-  { id: 'chili-night', name: 'Chili Night', kind: 'meal', stock: null, tags: ['meals'] },
-  { id: 'hot-dogs-burgers', name: 'Hot Dogs & Burgers', kind: 'meal', stock: null, tags: ['meals'] },
-  { id: 'foil-packet-dinners', name: 'Foil Packet Dinners', kind: 'meal', stock: null, tags: ['meals', 'fire'] },
-  { id: 'coffee-cocoa', name: 'Coffee & Cocoa', kind: 'meal', stock: null, tags: ['meals'] },
-  { id: 'smores-kit', name: "S'mores Kit", kind: 'meal', stock: null, tags: ['snacks', 'fire'] },
-  { id: 'sandwiches-wraps', name: 'Sandwiches & Wraps', kind: 'meal', stock: null, tags: ['snacks'] },
-  { id: 'trail-snacks', name: 'Trail Snacks', kind: 'meal', stock: null, tags: ['snacks'] },
-  { id: 'fruit-veggies', name: 'Fruit & Veggies', kind: 'meal', stock: null, tags: ['snacks'] },
+  { id: 'pancake-breakfast', name: 'Pancake Breakfast', kind: 'meal', stock: null, tags: ['meals'], ingredients: ['Pancake mix', 'Syrup', 'Butter', 'Griddle'] },
+  { id: 'breakfast-burritos', name: 'Breakfast Burritos', kind: 'meal', stock: null, tags: ['meals'], ingredients: ['Tortillas', 'Eggs', 'Cheese', 'Salsa', 'Sausage'] },
+  { id: 'chili-night', name: 'Chili Night', kind: 'meal', stock: null, tags: ['meals'], ingredients: ['Canned beans', 'Ground beef', 'Chili seasoning', 'Onion', 'Shredded cheese'] },
+  { id: 'hot-dogs-burgers', name: 'Hot Dogs & Burgers', kind: 'meal', stock: null, tags: ['meals'], ingredients: ['Hot dogs', 'Burger patties', 'Buns', 'Condiments', 'Cheese slices'] },
+  { id: 'foil-packet-dinners', name: 'Foil Packet Dinners', kind: 'meal', stock: null, tags: ['meals', 'fire'], ingredients: ['Foil', 'Potatoes', 'Sausage', 'Peppers & onions', 'Butter'] },
+  { id: 'coffee-cocoa', name: 'Coffee & Cocoa', kind: 'meal', stock: null, tags: ['meals'], ingredients: ['Coffee grounds', 'Cocoa packets', 'Sugar', 'Creamer'] },
+  { id: 'smores-kit', name: "S'mores Kit", kind: 'meal', stock: null, tags: ['snacks', 'fire'], ingredients: ['Graham crackers', 'Marshmallows', 'Chocolate bars'] },
+  { id: 'sandwiches-wraps', name: 'Sandwiches & Wraps', kind: 'meal', stock: null, tags: ['snacks'], ingredients: ['Bread & wraps', 'Deli meat', 'Cheese', 'Lettuce & tomato', 'Mustard / mayo'] },
+  { id: 'trail-snacks', name: 'Trail Snacks', kind: 'meal', stock: null, tags: ['snacks'], ingredients: ['Trail mix', 'Granola bars', 'Jerky', 'Dried fruit'] },
+  { id: 'fruit-veggies', name: 'Fruit & Veggies', kind: 'meal', stock: null, tags: ['snacks'], ingredients: ['Apples & bananas', 'Baby carrots', 'Grapes', 'Hummus'] },
 ]
 
 export const seedItems: Item[] = [
@@ -124,7 +124,7 @@ export const seedTags: Tag[] = [
 ]
 
 /** Bump when seed tags/cards are added so existing saves pick them up. */
-export const SEED_VERSION = 6
+export const SEED_VERSION = 7
 
 export const wizardSteps: WizardStep[] = [
   {

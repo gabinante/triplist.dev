@@ -4,6 +4,7 @@ import { AlertTriangle, Minus, Package, Pencil, Plus, Search, Trash2 } from 'luc
 import { makeId, useStore } from '../store'
 import type { Item, ItemKind } from '../types'
 import { Button, Chip, DynamicIcon, GlassPanel, Modal, inputClass } from '../components/ui'
+import { IngredientsEditor } from '../components/IngredientsEditor'
 
 type GearTab = 'gear' | 'consumables' | 'meals'
 
@@ -180,6 +181,12 @@ function ItemList({ kind }: { kind: ItemKind }) {
                     <Plus className="h-3.5 w-3.5" />
                   </button>
                 </div>
+              ) : kind === 'meal' ? (
+                (item.ingredients?.length ?? 0) > 0 && (
+                  <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-bark-500">
+                    {item.ingredients!.length} ingredients
+                  </span>
+                )
               ) : (
                 item.stock !== null && (
                   <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-bark-500">
@@ -246,6 +253,7 @@ function ItemModal({
   const [stock, setStock] = useState('')
   const [kind, setKind] = useState<ItemKind>(defaultKind)
   const [tags, setTags] = useState<string[]>([])
+  const [ingredients, setIngredients] = useState<string[]>([])
   const [loadedFor, setLoadedFor] = useState<string | null>(null)
 
   // sync form state when the modal target changes
@@ -256,6 +264,7 @@ function ItemModal({
     setStock(item?.stock?.toString() ?? '')
     setKind(item?.kind ?? defaultKind)
     setTags(item?.tags ?? [])
+    setIngredients(item?.ingredients ?? [])
   }
   if (!open && loadedFor !== null) setLoadedFor(null)
 
@@ -266,6 +275,7 @@ function ItemModal({
       kind,
       stock: stock.trim() === '' ? null : Number(stock),
       tags,
+      ingredients: kind === 'meal' && ingredients.length > 0 ? ingredients : undefined,
     }
     dispatch(item ? { type: 'updateItem', item: parsed } : { type: 'addItem', item: parsed })
     onClose()
@@ -294,6 +304,7 @@ function ItemModal({
             <Chip active={kind === 'meal'} onClick={() => setKind('meal')}>Meal — menu planning</Chip>
           </div>
         </div>
+        {kind === 'meal' && <IngredientsEditor value={ingredients} onChange={setIngredients} />}
         <div>
           <label className="mb-1.5 block text-xs font-medium text-bark-400">On lists</label>
           <div className="flex flex-wrap gap-1.5">

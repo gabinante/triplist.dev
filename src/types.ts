@@ -7,6 +7,8 @@ export interface Item {
   /** null = untracked; for consumables, 0 = out of stock */
   stock: number | null
   tags: string[]
+  /** Meals are mini lists — these get checked off individually on trips. */
+  ingredients?: string[]
 }
 
 export interface Tag {
