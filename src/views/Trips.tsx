@@ -3,9 +3,11 @@ import { motion } from 'framer-motion'
 import {
   AlertTriangle,
   ArrowLeft,
+  Boxes,
   Calendar,
   Check,
   CheckCheck,
+  ListChecks,
   Minus,
   Plus,
   RotateCcw,
@@ -14,6 +16,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { ingredientKey, isItemPacked, makeId, tripItems, tripProgress, useStore } from '../store'
+import { formatItemWeight, formatSummary, summarizeWeight } from '../lib/weight'
 import type { Item, ItemKind, Trip } from '../types'
 import { Button, Chip, DynamicIcon, GlassPanel, Modal, ProgressRing, inputClass } from '../components/ui'
 import { IngredientsEditor } from '../components/IngredientsEditor'
@@ -25,6 +28,7 @@ import type { Invite, ShareLinkInfo } from '../lib/shares'
 import { Inbox, Printer, Share2 } from 'lucide-react'
 import { PrintSheet } from '../components/PrintSheet'
 import type { PrintSheetData } from '../components/PrintSheet'
+import { PackingPlan } from '../components/PackingPlan'
 
 const GROUP_ORDER = [
   'toiletries',
@@ -296,6 +300,7 @@ function TripGrid({
       <div className="grid gap-4 sm:grid-cols-2">
         {state.trips.map((trip, i) => {
           const { packed, total } = tripProgress(trip, state.items)
+          const weight = summarizeWeight(tripItems(trip, state.items))
           return (
             <motion.div
               key={trip.id}
@@ -323,6 +328,12 @@ function TripGrid({
                       </>
                     )}
                     {packed}/{total} packed
+                    {weight.weighed > 0 && (
+                      <>
+                        <span className="text-bark-600">·</span>
+                        {formatSummary(weight)}
+                      </>
+                    )}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1">
                     {trip.tagIds.slice(0, 5).map(tagId => {
@@ -365,12 +376,16 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
   const [shareOpen, setShareOpen] = useState(false)
   const [authOpen, setAuthOpen] = useState(false)
   const [printSheet, setPrintSheet] = useState<PrintSheetData | null>(null)
+  const [view, setView] = useState<'checklist' | 'plan'>('checklist')
   const authAvailable = useAuthAvailable()
   const { data: session } = useSession()
 
   const list = tripItems(trip, state.items)
   const { packed, total } = tripProgress(trip, state.items)
   const outOfStock = list.filter(i => i.kind === 'consumable' && i.stock === 0)
+  const weight = summarizeWeight(list)
+  const containerIds = new Set((trip.containers ?? []).map(c => c.id))
+  const unsortedCount = list.filter(i => !containerIds.has(trip.assignments?.[i.id] ?? '')).length
 
   const groups = useMemo(() => {
     const tagSet = new Set(trip.tagIds)
@@ -441,6 +456,18 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                   day: 'numeric',
                 }) + ' · '}
               {packed} of {total} packed
+              {weight.weighed > 0 && (
+                <>
+                  {' · '}
+                  <span className="text-bark-300">{formatSummary(weight)}</span>
+                  {weight.missing > 0 && (
+                    <span className="text-bark-600">
+                      {' '}
+                      ({weight.missing} {weight.missing === 1 ? 'item' : 'items'} missing weight)
+                    </span>
+                  )}
+                </>
+              )}
             </p>
             <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
               {trip.tagIds.map(tagId => {
@@ -529,6 +556,7 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                     }),
                   `${total} items`,
                   `${packed} packed`,
+                  weight.weighed > 0 && formatSummary(weight),
                 ]
                   .filter(Boolean)
                   .join(' · '),
@@ -556,6 +584,42 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
         </div>
       </GlassPanel>
 
+      <div className="mb-5 flex items-center justify-between">
+        <div className="glass flex rounded-xl p-1">
+          {(
+            [
+              { id: 'checklist', label: 'Checklist', icon: ListChecks },
+              { id: 'plan', label: 'Packing plan', icon: Boxes },
+            ] as const
+          ).map(t => (
+            <button
+              key={t.id}
+              onClick={() => setView(t.id)}
+              className={`flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-all cursor-pointer ${
+                view === t.id ? 'bg-moss-500/70 text-moss-50 shadow' : 'text-bark-400 hover:text-bark-200'
+              }`}
+            >
+              <t.icon className="h-4 w-4" />
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {view === 'plan' && (trip.containers?.length ?? 0) > 0 && unsortedCount > 0 && (
+          <span className="text-xs text-bark-500">{unsortedCount} unsorted</span>
+        )}
+      </div>
+
+      {/* No AnimatePresence here: layout-animated rows inside the plan view can
+          stall its exit and leave the next view unmounted. Keyed remount only. */}
+      <motion.div
+        key={view}
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.15 }}
+      >
+          {view === 'plan' ? (
+            <PackingPlan trip={trip} items={list} onUpdate={update} />
+          ) : (
       <div className="space-y-5">
         {groups.map(([groupTag, items]) => {
           const tag = state.tags.find(t => t.id === groupTag)
@@ -596,6 +660,11 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                       >
                         {item.name}
                       </span>
+                      {item.weight != null && (
+                        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] tabular-nums text-bark-500">
+                          {formatItemWeight(item)}
+                        </span>
+                      )}
                       {item.kind === 'consumable' && item.stock === 0 ? (
                         <span className="flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
                           <AlertTriangle className="h-3 w-3" /> Out of stock
@@ -649,6 +718,8 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
           )
         })}
       </div>
+          )}
+      </motion.div>
 
       <AddItemModal trip={trip} open={addOpen} onClose={() => setAddOpen(false)} />
       <ShareModal

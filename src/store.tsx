@@ -211,6 +211,9 @@ function reducer(state: State, action: Action): State {
           ...t,
           extras: t.extras.filter(id => id !== action.id),
           excluded: t.excluded.filter(id => id !== action.id),
+          assignments: t.assignments
+            ? Object.fromEntries(Object.entries(t.assignments).filter(([id]) => id !== action.id))
+            : undefined,
         })),
       }
     case 'addTag':

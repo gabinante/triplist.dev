@@ -25,6 +25,13 @@ export interface Tag {
   auto?: boolean
 }
 
+/** A place things get packed into — a car, a backpack, the cooler. */
+export interface TripContainer {
+  id: string
+  name: string
+  icon: string
+}
+
 export interface Trip {
   id: string
   name: string
@@ -34,6 +41,9 @@ export interface Trip {
   excluded: string[]
   extras: string[]
   createdAt: number
+  /** Packing plan: containers plus itemId → containerId. */
+  containers?: TripContainer[]
+  assignments?: Record<string, string>
 }
 
 export interface WizardCard {

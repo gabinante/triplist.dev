@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AlertTriangle, Minus, Package, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { makeId, useStore } from '../store'
-import type { Item, ItemKind } from '../types'
+import type { Item, ItemKind, WeightUnit } from '../types'
+import { WEIGHT_UNITS, formatItemWeight } from '../lib/weight'
 import { Button, Chip, DynamicIcon, GlassPanel, Modal, inputClass } from '../components/ui'
 import { IngredientsEditor } from '../components/IngredientsEditor'
 
@@ -153,6 +154,12 @@ function ItemList({ kind }: { kind: ItemKind }) {
                 {item.name}
               </span>
 
+              {item.weight != null && (
+                <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] tabular-nums text-bark-500">
+                  {formatItemWeight(item)}
+                </span>
+              )}
+
               {kind === 'consumable' ? (
                 <div className="flex items-center gap-1">
                   {out && (
@@ -254,6 +261,8 @@ function ItemModal({
   const [kind, setKind] = useState<ItemKind>(defaultKind)
   const [tags, setTags] = useState<string[]>([])
   const [ingredients, setIngredients] = useState<string[]>([])
+  const [weight, setWeight] = useState('')
+  const [weightUnit, setWeightUnit] = useState<WeightUnit>('g')
   const [loadedFor, setLoadedFor] = useState<string | null>(null)
 
   // sync form state when the modal target changes
@@ -265,10 +274,14 @@ function ItemModal({
     setKind(item?.kind ?? defaultKind)
     setTags(item?.tags ?? [])
     setIngredients(item?.ingredients ?? [])
+    setWeight(item?.weight?.toString() ?? '')
+    setWeightUnit(item?.weightUnit ?? 'g')
   }
   if (!open && loadedFor !== null) setLoadedFor(null)
 
   const save = () => {
+    const parsedWeight = weight.trim() === '' ? NaN : Number(weight)
+    const hasWeight = Number.isFinite(parsedWeight) && parsedWeight > 0
     const parsed: Item = {
       id: item?.id ?? makeId(name),
       name: name.trim(),
@@ -276,6 +289,8 @@ function ItemModal({
       stock: stock.trim() === '' ? null : Number(stock),
       tags,
       ingredients: kind === 'meal' && ingredients.length > 0 ? ingredients : undefined,
+      weight: hasWeight ? parsedWeight : undefined,
+      weightUnit: hasWeight ? weightUnit : undefined,
     }
     dispatch(item ? { type: 'updateItem', item: parsed } : { type: 'addItem', item: parsed })
     onClose()
@@ -294,6 +309,30 @@ function ItemModal({
               {kind === 'consumable' ? 'In stock' : 'Qty owned'}
             </label>
             <input className={inputClass} type="number" min="0" value={stock} onChange={e => setStock(e.target.value)} placeholder="—" />
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-bark-400">Weight</label>
+            <input
+              className={inputClass}
+              type="number"
+              min="0"
+              step="any"
+              value={weight}
+              onChange={e => setWeight(e.target.value)}
+              placeholder="—"
+            />
+          </div>
+          <div className="col-span-2">
+            <label className="mb-1.5 block text-xs font-medium text-bark-400">Unit</label>
+            <div className="flex flex-wrap gap-1.5 pt-1.5">
+              {WEIGHT_UNITS.map(u => (
+                <Chip key={u} active={weightUnit === u} onClick={() => setWeightUnit(u)}>
+                  {u}
+                </Chip>
+              ))}
+            </div>
           </div>
         </div>
         <div>
