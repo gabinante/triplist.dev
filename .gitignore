@@ -8,3 +8,4 @@ tsconfig.tsbuildinfo
 .claude/*.lock
 .env
 .env.*
+!.env.example
