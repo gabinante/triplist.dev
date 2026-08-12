@@ -18,10 +18,14 @@ help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "} {printf "  \033[36m%-11s\033[0m %s\n", $$1, $$2}'
 
-setup: check-node install env ## Set up from scratch: check Node, install deps, scaffold .env
-	@echo "✔ Setup complete."
-	@echo "  make dev    → dev server (no database needed; auth disabled)"
-	@echo "  make db-up  → optional local Postgres if you want auth features"
+setup: check-node install env ## Set up from scratch: Node check, deps, .env, local database
+	@if command -v docker >/dev/null 2>&1; then \
+		$(MAKE) --no-print-directory db-up; \
+	else \
+		echo "⚠ Docker not found — skipping local database. The app still runs guest-only"; \
+		echo "  (auth disabled); install Docker and run 'make db-up' to enable auth."; \
+	fi
+	@echo "✔ Setup complete — run 'make dev' to start the app."
 
 check-node: ## Verify Node.js >= $(NODE_MIN) is installed
 	@command -v node >/dev/null 2>&1 || { \
@@ -44,7 +48,18 @@ env: ## Create .env from .env.example (never overwrites an existing .env)
 		cp .env.example .env && echo "✔ Created .env from .env.example (all vars optional)"; \
 	fi
 
-dev: ## Start the Vite dev server
+dev: ## Start the app: API server on :8080 + Vite dev server on :5199
+	@if command -v docker >/dev/null 2>&1 && \
+		[ "$$(docker ps -aq -f name=^$(DB_CONTAINER)$$)" ] && \
+		[ -z "$$(docker ps -q -f name=^$(DB_CONTAINER)$$)" ]; then \
+		docker start $(DB_CONTAINER) >/dev/null && echo "✔ restarted $(DB_CONTAINER)"; \
+		for i in $$(seq 1 15); do \
+			docker exec $(DB_CONTAINER) pg_isready -U triplist -d triplist >/dev/null 2>&1 && break; \
+			sleep 1; \
+		done; \
+	fi
+	@trap 'kill 0' EXIT INT TERM; \
+	node --env-file-if-exists=.env server/index.mjs & \
 	npm run dev
 
 build: ## Typecheck + production build (tsc -b && vite build)
@@ -76,11 +91,12 @@ db-up: ## Start a local Postgres in Docker and seed the schema (for auth feature
 	docker exec $(DB_CONTAINER) pg_isready -U triplist -d triplist >/dev/null 2>&1 || { \
 		echo "✖ Postgres didn't become ready — check 'docker logs $(DB_CONTAINER)'"; exit 1; }
 	@echo "✔ Postgres up."
+	@touch .env; \
+	grep -qE '^DATABASE_URL=' .env || { echo 'DATABASE_URL=$(DB_URL)' >> .env; echo "  .env: set DATABASE_URL"; }; \
+	grep -qE '^BETTER_AUTH_SECRET=.' .env || { echo "BETTER_AUTH_SECRET=$$(openssl rand -hex 32)" >> .env; echo "  .env: generated BETTER_AUTH_SECRET"; }; \
+	grep -qE '^BETTER_AUTH_URL=' .env || { echo 'BETTER_AUTH_URL=http://localhost:5199' >> .env; echo "  .env: set BETTER_AUTH_URL"; }
 	@$(MAKE) --no-print-directory db-seed
-	@echo "  To enable auth, set in .env:"
-	@echo "    DATABASE_URL=$(DB_URL)"
-	@echo "    BETTER_AUTH_SECRET=$$(openssl rand -hex 32 2>/dev/null || echo '<openssl rand -hex 32>')"
-	@echo "    BETTER_AUTH_URL=http://localhost:8080"
+	@echo "✔ Local database ready — auth is enabled next time the server starts."
 
 db-seed: ## Create the auth schema in the database (better-auth migrate; safe to re-run)
 	@[ -d node_modules ] || { echo "✖ Dependencies missing — run 'make setup' first."; exit 1; }

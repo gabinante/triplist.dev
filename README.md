@@ -7,22 +7,17 @@ that match it — picked through a card-based wizard.
 ## Running
 
 ```sh
-make setup   # check Node ≥20, npm ci, scaffold .env from .env.example
-make dev     # start the Vite dev server
+make setup   # Node check, npm ci, .env scaffold, local Postgres (Docker) + auth schema
+make dev     # API server on :8080 + Vite dev server on :5199 (proxies /api)
 ```
 
-Run `make` alone to list all targets. The database is optional — without `DATABASE_URL` the
-app runs guest-only with auth disabled. To try auth features locally:
+That's the whole local stack, auth included — `make db-up` seeds the database and fills the
+auth vars into `.env` automatically. Run `make` alone to list all targets.
 
-```sh
-make db-up   # start Postgres 17 in Docker (port 5442) and seed the auth schema
-             # then paste the printed DATABASE_URL / BETTER_AUTH_* lines into .env
-make start   # build + serve the production app with .env loaded
-```
-
-`make db-seed` re-applies the better-auth schema (idempotent) against whatever
-`DATABASE_URL` is in `.env`; app tables like `trip_share` are created by the server on boot.
-Prefer plain npm? `npm install` + `npm run dev` still works.
+No Docker? `make setup` skips the database and the app runs guest-only (auth disabled,
+state in localStorage only). `make db-seed` re-applies the better-auth schema (idempotent);
+app tables like `trip_share` and `user_state` are created by the server on boot.
+`make start` builds and serves the production bundle on :8080.
 
 ## How it works
 
