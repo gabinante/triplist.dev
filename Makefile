@@ -83,6 +83,7 @@ db-up: ## Start a local Postgres in Docker and seed the schema (for auth feature
 	@echo "    BETTER_AUTH_URL=http://localhost:8080"
 
 db-seed: ## Create the auth schema in the database (better-auth migrate; safe to re-run)
+	@[ -d node_modules ] || { echo "✖ Dependencies missing — run 'make setup' first."; exit 1; }
 	@DATABASE_URL=$$(grep -E '^DATABASE_URL=' .env 2>/dev/null | head -1 | cut -d= -f2-); \
 	export DATABASE_URL=$${DATABASE_URL:-$(DB_URL)}; \
 	echo "  seeding schema at $$DATABASE_URL"; \
