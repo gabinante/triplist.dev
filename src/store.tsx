@@ -46,6 +46,7 @@ type Action =
   | { type: 'hydrate'; state: State }
   | { type: 'importTrip'; trip: Trip; items: Item[]; tags: Tag[] }
   | { type: 'importList'; tag: Tag; items: Item[] }
+  | { type: 'importItems'; items: Item[]; tags: Tag[] }
   | { type: 'startBlank' }
   | { type: 'resetData' }
 
@@ -200,6 +201,8 @@ function reducer(state: State, action: Action): State {
   switch (action.type) {
     case 'addItem':
       return { ...state, items: [...state.items, action.item] }
+    case 'importItems':
+      return { ...state, items: [...state.items, ...action.items], tags: unionById(state.tags, action.tags) }
     case 'updateItem':
       return { ...state, items: state.items.map(i => (i.id === action.item.id ? action.item : i)) }
     case 'deleteItem':
@@ -214,6 +217,7 @@ function reducer(state: State, action: Action): State {
           assignments: t.assignments
             ? Object.fromEntries(Object.entries(t.assignments).filter(([id]) => id !== action.id))
             : undefined,
+          worn: t.worn?.filter(id => id !== action.id),
         })),
       }
     case 'addTag':
@@ -332,6 +336,21 @@ export function isItemPacked(trip: Trip, item: Item): boolean {
   if (item.kind === 'meal' && item.ingredients?.length)
     return item.ingredients.every(ing => trip.packed[ingredientKey(item.id, ing)])
   return !!trip.packed[item.id]
+}
+
+/** Worn on this trip (on your back, not in the pack)? Untouched trips inherit each item's default. */
+export function isWorn(trip: Trip, item: Item): boolean {
+  return trip.worn ? trip.worn.includes(item.id) : !!item.worn
+}
+
+/**
+ * The trip's `worn` list after toggling one item. The first toggle freezes the
+ * item defaults into the trip, so editing gear later doesn't silently change
+ * an old trip's numbers.
+ */
+export function toggleWorn(trip: Trip, items: Item[], itemId: string): string[] {
+  const current = trip.worn ?? items.filter(i => i.worn).map(i => i.id)
+  return current.includes(itemId) ? current.filter(id => id !== itemId) : [...current, itemId]
 }
 
 export function tripProgress(trip: Trip, items: Item[]): { packed: number; total: number } {

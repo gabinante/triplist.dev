@@ -16,8 +16,8 @@ import {
   Tent,
   Trash2,
 } from 'lucide-react'
-import { ingredientKey, isItemPacked, makeId, tripItems, tripProgress, useStore } from '../store'
-import { formatItemWeight, formatSummary, summarizeWeight } from '../lib/weight'
+import { ingredientKey, isItemPacked, isWorn, makeId, tripItems, tripProgress, useStore } from '../store'
+import { formatItemWeight, formatSummary, formatWorn, summarizeWeight } from '../lib/weight'
 import type { Item, ItemKind, Trip } from '../types'
 import { Button, Chip, DynamicIcon, GlassPanel, Modal, ProgressRing, inputClass } from '../components/ui'
 import { IngredientsEditor } from '../components/IngredientsEditor'
@@ -301,7 +301,7 @@ function TripGrid({
       <div className="grid gap-4 sm:grid-cols-2">
         {state.trips.map((trip, i) => {
           const { packed, total } = tripProgress(trip, state.items)
-          const weight = summarizeWeight(tripItems(trip, state.items))
+          const weight = summarizeWeight(tripItems(trip, state.items), trip.worn ? new Set(trip.worn) : undefined)
           return (
             <motion.div
               key={trip.id}
@@ -331,10 +331,11 @@ function TripGrid({
                       </>
                     )}
                     {packed}/{total} packed
-                    {weight.weighed > 0 && (
+                    {(weight.weighed > 0 || weight.worn > 0) && (
                       <>
                         <span className="text-bark-600">·</span>
                         {formatSummary(weight)}
+                        {weight.worn > 0 && ` carried ${formatWorn(weight)}`}
                       </>
                     )}
                   </p>
@@ -399,7 +400,7 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
   const list = tripItems(trip, state.items)
   const { packed, total } = tripProgress(trip, state.items)
   const outOfStock = list.filter(i => i.kind === 'consumable' && i.stock === 0)
-  const weight = summarizeWeight(list)
+  const weight = summarizeWeight(list, trip.worn ? new Set(trip.worn) : undefined)
   const containerIds = new Set((trip.containers ?? []).map(c => c.id))
   const unsortedCount = list.filter(i => !containerIds.has(trip.assignments?.[i.id] ?? '')).length
 
@@ -480,10 +481,11 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                   day: 'numeric',
                 }) + ' · '}
               {packed} of {total} packed
-              {weight.weighed > 0 && (
+              {(weight.weighed > 0 || weight.worn > 0) && (
                 <>
                   {' · '}
                   <span className="text-bark-300">{formatSummary(weight)}</span>
+                  {weight.worn > 0 && <span className="text-bark-300"> carried {formatWorn(weight)}</span>}
                   {weight.missing > 0 && (
                     <span className="text-bark-600">
                       {' '}
@@ -588,7 +590,7 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                     }),
                   `${total} items`,
                   `${packed} packed`,
-                  weight.weighed > 0 && formatSummary(weight),
+                  (weight.weighed > 0 || weight.worn > 0) && `${formatSummary(weight)}${weight.worn > 0 ? ` carried ${formatWorn(weight)}` : ''}`,
                 ]
                   .filter(Boolean)
                   .join(' · '),
@@ -732,6 +734,7 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                       {item.weight != null && (
                         <span className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[11px] tabular-nums text-bark-400">
                           {formatItemWeight(item)}
+                          {isWorn(trip, item) && ' worn'}
                         </span>
                       )}
                       {item.kind === 'consumable' && item.stock === 0 ? (

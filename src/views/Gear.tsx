@@ -1,17 +1,23 @@
 import { useId, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { AlertTriangle, Minus, Package, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { AlertTriangle, Minus, Package, Pencil, Plus, Search, Shirt, Trash2, Upload } from 'lucide-react'
 import { makeId, useStore } from '../store'
 import type { Item, ItemKind, WeightUnit } from '../types'
 import { WEIGHT_UNITS, formatItemWeight } from '../lib/weight'
 import { Button, Chip, DynamicIcon, GlassPanel, Modal, inputClass } from '../components/ui'
 import { IngredientsEditor } from '../components/IngredientsEditor'
+import { ImportItemsModal } from '../components/ImportItemsModal'
+import type { ImportSummary } from '../components/ImportItemsModal'
+import { isWebUrl } from '../lib/csv-import'
 
 type GearTab = 'gear' | 'consumables' | 'meals'
 
 export function GearView() {
   const { state } = useStore()
   const [tab, setTab] = useState<GearTab>('gear')
+  const [importOpen, setImportOpen] = useState(false)
+  const [imported, setImported] = useState<ImportSummary | null>(null)
+  const [listKey, setListKey] = useState(0)
   const outCount = state.items.filter(i => i.kind === 'consumable' && i.stock === 0).length
 
   return (
@@ -48,6 +54,7 @@ export function GearView() {
       <p className="mb-6 text-sm text-bark-400">
         Manage what you own, track supplies, and plan meals. Add items to lists to include them when you plan a trip.
       </p>
+      {imported && <p role="status" className="mb-4 rounded-xl border border-moss-400/30 bg-moss-500/10 px-4 py-3 text-sm text-moss-200">Imported {imported.items} {imported.items === 1 ? 'item' : 'items'}{imported.lists ? ` and created ${imported.lists} ${imported.lists === 1 ? 'list' : 'lists'}` : ''}.{imported.skipped ? ` Skipped ${imported.skipped} matching ${imported.skipped === 1 ? 'item' : 'items'}.` : ''}</p>}
       <AnimatePresence mode="wait">
         <motion.div
           key={tab}
@@ -56,14 +63,15 @@ export function GearView() {
           exit={{ opacity: 0, y: -8 }}
           transition={{ duration: 0.15 }}
         >
-          <ItemList kind={tab === 'gear' ? 'gear' : tab === 'consumables' ? 'consumable' : 'meal'} />
+          <ItemList key={listKey} kind={tab === 'gear' ? 'gear' : tab === 'consumables' ? 'consumable' : 'meal'} onImport={() => setImportOpen(true)} />
         </motion.div>
       </AnimatePresence>
+      {importOpen && <ImportItemsModal onClose={() => setImportOpen(false)} onImported={summary => { setImported(summary); setTab(summary.kind); setListKey(key => key + 1); setImportOpen(false) }} />}
     </div>
   )
 }
 
-function ItemList({ kind }: { kind: ItemKind }) {
+function ItemList({ kind, onImport }: { kind: ItemKind; onImport: () => void }) {
   const { state, dispatch } = useStore()
   const [query, setQuery] = useState('')
   const [filterTag, setFilterTag] = useState<string | null>(null)
@@ -103,6 +111,7 @@ function ItemList({ kind }: { kind: ItemKind }) {
             <Plus className="h-4 w-4" /> Add {kind === 'gear' ? 'gear' : kind === 'consumable' ? 'consumable' : 'meal'}
           </span>
         </Button>
+        <Button variant="ghost" onClick={onImport}><span className="flex items-center gap-1.5"><Upload className="h-4 w-4" /> Import CSV</span></Button>
       </div>
 
       {outOfStock.length > 0 && (
@@ -155,7 +164,11 @@ function ItemList({ kind }: { kind: ItemKind }) {
             >
               <div className="min-w-0 flex-1 basis-36">
                 <div className="flex items-start gap-2">
-                  {out ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" /> : <Package className="mt-0.5 h-4 w-4 shrink-0 text-bark-400" />}
+                  {item.worn ? (
+                    <span role="img" aria-label="Worn" title="Usually worn · excluded from carried weight" className="mt-0.5 shrink-0 text-moss-300">
+                      <Shirt aria-hidden="true" className="h-4 w-4" />
+                    </span>
+                  ) : out ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" /> : <Package className="mt-0.5 h-4 w-4 shrink-0 text-bark-400" />}
                   <h2 className={`min-w-0 break-words text-sm font-medium ${out ? 'text-amber-100' : 'text-bark-100'}`}>{item.name}</h2>
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-6 text-xs text-bark-300">
@@ -261,6 +274,10 @@ function ItemModal({
   const [ingredients, setIngredients] = useState<string[]>([])
   const [weight, setWeight] = useState('')
   const [weightUnit, setWeightUnit] = useState<WeightUnit>('g')
+  const [description, setDescription] = useState('')
+  const [url, setUrl] = useState('')
+  const [price, setPrice] = useState('')
+  const [worn, setWorn] = useState(false)
   const [listQuery, setListQuery] = useState('')
   const [loadedFor, setLoadedFor] = useState<string | null>(null)
   const formId = useId()
@@ -276,6 +293,10 @@ function ItemModal({
     setIngredients(item?.ingredients ?? [])
     setWeight(item?.weight?.toString() ?? '')
     setWeightUnit(item?.weightUnit ?? 'g')
+    setDescription(item?.description ?? '')
+    setUrl(item?.url ?? '')
+    setPrice(item?.price?.toString() ?? '')
+    setWorn(!!item?.worn)
     setListQuery('')
   }
   if (!open && loadedFor !== null) setLoadedFor(null)
@@ -284,13 +305,17 @@ function ItemModal({
   const parsedStock = stock.trim() === '' ? null : Number(stock)
   const weightInvalid = parsedWeight !== null && (!Number.isFinite(parsedWeight) || parsedWeight < 0)
   const stockInvalid = parsedStock !== null && (!Number.isInteger(parsedStock) || parsedStock < 0)
-  const canSave = name.trim() !== '' && !weightInvalid && !stockInvalid
+  const parsedPrice = price.trim() === '' ? undefined : Number(price)
+  const priceInvalid = parsedPrice !== undefined && (!Number.isFinite(parsedPrice) || parsedPrice < 0)
+  const urlInvalid = url.trim() !== '' && !isWebUrl(url.trim())
+  const canSave = name.trim() !== '' && !weightInvalid && !stockInvalid && !priceInvalid && !urlInvalid
   const visibleTags = state.tags.filter(tag => tag.name.toLowerCase().includes(listQuery.trim().toLowerCase()))
 
   const save = () => {
     if (!canSave) return
     const hasWeight = parsedWeight !== null
     const parsed: Item = {
+      ...item,
       id: item?.id ?? makeId(name),
       name: name.trim(),
       kind,
@@ -299,6 +324,10 @@ function ItemModal({
       ingredients: kind === 'meal' && ingredients.length > 0 ? ingredients : undefined,
       weight: hasWeight ? parsedWeight : undefined,
       weightUnit: hasWeight ? weightUnit : undefined,
+      description: description.trim() || undefined,
+      url: url.trim() || undefined,
+      price: parsedPrice,
+      worn: worn || undefined,
     }
     dispatch(item ? { type: 'updateItem', item: parsed } : { type: 'addItem', item: parsed })
     onClose()
@@ -349,6 +378,16 @@ function ItemModal({
           </fieldset>
         </div>
         <p id={`${formId}-weight-help`} className={`text-xs ${weightInvalid ? 'text-red-300' : 'text-bark-400'}`}>{weightInvalid ? 'Enter a weight of 0 or more.' : 'Leave blank for unknown weight. The number stays the same when you choose a unit.'}</p>
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-bark-200"><input type="checkbox" checked={worn} onChange={event => setWorn(event.target.checked)} className="h-5 w-5 accent-moss-500" />Usually worn</label>
+        <p className="-mt-2 text-xs text-bark-400">Worn items stay on your checklist and are excluded from carried weight.</p>
+        <details open={item && (item.description || item.url || item.price != null) ? true : undefined} className="rounded-xl border border-white/10 p-3">
+          <summary className="min-h-8 cursor-pointer text-sm font-medium text-bark-200">Description, link, and price</summary>
+          <div className="mt-3 space-y-3">
+            <div><label htmlFor={`${formId}-description`} className="mb-1.5 block text-xs text-bark-300">Description</label><textarea id={`${formId}-description`} className={inputClass} rows={3} value={description} onChange={event => setDescription(event.target.value)} /></div>
+            <div><label htmlFor={`${formId}-url`} className="mb-1.5 block text-xs text-bark-300">Item URL</label><input id={`${formId}-url`} type="url" className={inputClass} value={url} onChange={event => setUrl(event.target.value)} placeholder="https://…" aria-invalid={urlInvalid} />{urlInvalid && <p className="mt-1 text-xs text-red-300">Use a complete http:// or https:// link.</p>}</div>
+            <div><label htmlFor={`${formId}-price`} className="mb-1.5 block text-xs text-bark-300">Price (no currency assumed)</label><input id={`${formId}-price`} type="number" min="0" step="any" inputMode="decimal" className={inputClass} value={price} onChange={event => setPrice(event.target.value)} aria-invalid={priceInvalid} />{priceInvalid && <p className="mt-1 text-xs text-red-300">Enter a price of 0 or more.</p>}</div>
+          </div>
+        </details>
         <fieldset>
           <legend className="mb-1.5 block text-xs font-medium text-bark-300">Type</legend>
           <div className="flex flex-wrap gap-1.5">
