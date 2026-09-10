@@ -10,7 +10,7 @@ export function itemGrams(item: Item): number | null {
 }
 
 /** The item's weight as entered, e.g. "2.5 lb". */
-export function formatItemWeight(item: Item): string | null {
+export function formatItemWeight(item: Pick<Item, 'weight' | 'weightUnit'>): string | null {
   if (item.weight == null || !Number.isFinite(item.weight)) return null
   return `${item.weight} ${item.weightUnit ?? 'g'}`
 }
@@ -23,15 +23,22 @@ export interface WeightSummary {
   missing: number
   /** True when most weighed items were entered in oz/lb. */
   imperial: boolean
+  /** Grams worn rather than carried — reported beside the total, never in it. */
+  worn: number
 }
 
-export function summarizeWeight(items: Item[]): WeightSummary {
+export function summarizeWeight(items: Item[], wornIds?: ReadonlySet<string>): WeightSummary {
   let grams = 0
   let weighed = 0
   let missing = 0
   let imperialCount = 0
+  let worn = 0
   for (const item of items) {
     const g = itemGrams(item)
+    if (wornIds ? wornIds.has(item.id) : item.worn) {
+      if (g !== null) worn += g
+      continue
+    }
     if (g === null) {
       missing++
     } else {
@@ -40,7 +47,7 @@ export function summarizeWeight(items: Item[]): WeightSummary {
       if (item.weightUnit === 'oz' || item.weightUnit === 'lb') imperialCount++
     }
   }
-  return { grams, weighed, missing, imperial: imperialCount > weighed / 2 }
+  return { grams, weighed, missing, imperial: imperialCount > weighed / 2, worn }
 }
 
 export function formatGrams(grams: number, imperial = false): string {
@@ -56,4 +63,9 @@ export function formatGrams(grams: number, imperial = false): string {
 /** "≈ 4.2 kg" when some items are unweighed, "4.2 kg" when all are. */
 export function formatSummary(w: WeightSummary): string {
   return `${w.missing > 0 ? '≈ ' : ''}${formatGrams(w.grams, w.imperial)}`
+}
+
+/** "+ 1.2 kg worn" — what's on your body on top of the carried total. */
+export function formatWorn(w: WeightSummary): string {
+  return `+ ${formatGrams(w.worn, w.imperial)} worn`
 }

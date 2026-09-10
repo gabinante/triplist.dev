@@ -31,3 +31,9 @@ Run `node scripts/qa/container-journey.mjs` with the local app running. Final ve
 Evidence: `/private/tmp/triplist-ux/containers/` contains `before-*`, `after-*`, and `results.json`. Before screenshots cover dark desktop/mobile; both themes are covered after. Full-page captures include the complete packing plan. The fixed mobile navigation appears at the first viewport's bottom within a longer full-page image; it remains at the viewport bottom during normal scrolling.
 
 Scope: Chromium mobile emulation covers viewport/touch behavior, not a physical iOS/Android browser or a signed-in account.
+
+## Direct destination menu
+
+Packing-plan items now offer a right-click destination menu and a visible 44px move button. The menu shows every container, marks the current location, and offers Not sorted yet. It is rendered outside the panels, fits within the viewport, and scrolls internally when there are many containers. It supports arrow keys, Home/End, typing a container name, Escape, Tab, and Shift+F10. Moving an item preserves its packed state and the selected sorting container; focus returns to a nearby item without jumping to the destination.
+
+`TRIPLIST_URL=http://127.0.0.1:5201 node scripts/qa/container-menu-journey.mjs` exercises a 70-item trip with 18 containers in all four light/dark and desktop/mobile combinations. Checks cover direct moves, reassignment, unsorting, current-location indicators, long container names, viewport bounds, focus restoration, keyboard navigation, button toggling, and outside/scroll dismissal. Results and screenshots are written to `/private/tmp/triplist-container-menu`.

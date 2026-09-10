@@ -32,6 +32,25 @@ app tables like `trip_share` and `user_state` are created by the server on boot.
 Wizard cards are defined in `src/data/seed.ts` (`wizardSteps`) — edit the `tags` array on a card
 to change which lists it pulls in.
 
+## Importing a CSV
+
+Open **Gear → Import CSV**, choose a file, review the preview, and confirm the import.
+Download a sample from the import dialog or use `public/item-import-template.csv`.
+
+```csv
+Item Name,Category,desc,qty,weight,unit,url,price,worn,consumable
+Rain jacket,Clothing,"Waterproof, packable",1,10,ounce,https://example.com/jacket,89.95,Worn,
+```
+
+- **Item Name** is required. Other columns are optional, and headers may be reordered or use different capitalization.
+- **Category** creates or reuses a List by name. An empty category leaves the item unlisted.
+- **qty** is the quantity owned/in stock, a whole number of zero or more. Blank means untracked.
+- **weight** is the per-item weight, with **unit** in g, kg, oz, lb, or their full singular/plural names. Blank weight means unknown; zero remains zero.
+- **desc**, **url**, and **price** become editable item details. URLs must begin with http:// or https://; prices are nonnegative numbers with no currency assumed.
+- **worn** and **consumable** accept the column name, yes/no, true/false, or 1/0. Blank means false. Consumables appear in the Consumables tab. Worn items remain on the checklist, with weight reported separately from carried weight.
+
+Matching items are skipped by default using their category and all imported details; existing items are never overwritten. Uncheck **Skip matching items** to import additional copies. Any invalid row blocks the entire import until corrected. Files can contain up to 1,000 items and be up to 1 MB, subject to the library's sync storage limit.
+
 ## Data
 
 - Seed gear comes from the original spreadsheet, generated into `src/data/seed-items.ts`.

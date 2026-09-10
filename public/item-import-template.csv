@@ -1,0 +1,3 @@
+Item Name,Category,desc,qty,weight,unit,url,price,worn,consumable
+Rain jacket,Clothing,"Waterproof, packable",1,10,ounce,https://example.com/jacket,89.95,Worn,
+Trail snacks,Food/Water,One day's snacks,2,150,gram,,5,,Consumable

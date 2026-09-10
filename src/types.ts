@@ -9,11 +9,17 @@ export interface Item {
   /** null = untracked; for consumables, 0 = out of stock */
   stock: number | null
   tags: string[]
+  description?: string
+  url?: string
+  /** Amount from the CSV; no currency is inferred. */
+  price?: number
   /** Meals are mini lists — these get checked off individually on trips. */
   ingredients?: string[]
   /** Optional, in `weightUnit` units (grams when unset). */
   weight?: number
   weightUnit?: WeightUnit
+  /** Usually on your body, not in the pack — its weight is left out of totals by default. */
+  worn?: boolean
 }
 
 export interface Tag {
@@ -44,6 +50,8 @@ export interface Trip {
   /** Packing plan: containers plus itemId → containerId. */
   containers?: TripContainer[]
   assignments?: Record<string, string>
+  /** Item ids worn on this trip (weight not carried). Unset = each item's own default. */
+  worn?: string[]
 }
 
 export interface WizardCard {

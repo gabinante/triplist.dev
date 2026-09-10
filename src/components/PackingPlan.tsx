@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -15,11 +15,13 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
-import { Boxes, Check, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { ArrowRightLeft, Boxes, Check, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { isItemPacked, makeId } from '../store'
 import type { Item, Trip, TripContainer } from '../types'
 import { Button, Chip, DynamicIcon, GlassPanel, Modal } from './ui'
-import { formatItemWeight, formatSummary, summarizeWeight } from '../lib/weight'
+import { formatItemWeight, formatSummary, formatWorn, summarizeWeight } from '../lib/weight'
+import { ContainerMenu } from './ContainerMenu'
+import type { ContainerMenuAnchor } from './ContainerMenu'
 
 const SUGGESTIONS: { name: string; icon: string }[] = [
   { name: 'Car', icon: 'Car' },
@@ -67,6 +69,13 @@ export function PackingPlan({
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [announcement, setAnnouncement] = useState('')
+  const [itemMenu, setItemMenu] = useState<(ContainerMenuAnchor & { itemId: string }) | null>(null)
+  const menuId = useId()
+  const planRef = useRef<HTMLDivElement>(null)
+  const focusFrame = useRef<number | null>(null)
+  useEffect(() => () => {
+    if (focusFrame.current !== null) cancelAnimationFrame(focusFrame.current)
+  }, [])
 
   // A small movement threshold keeps plain taps working as taps; on touch a
   // short hold distinguishes a drag from a scroll.
@@ -80,6 +89,32 @@ export function PackingPlan({
   const unsorted = items.filter(i => !assignments[i.id] || !containerIds.has(assignments[i.id]))
   const dragging = draggingId ? items.find(i => i.id === draggingId) ?? null : null
   const removing = containers.find(c => c.id === removingId)
+  const menuItem = items.find(item => item.id === itemMenu?.itemId)
+
+  const openItemMenu = (item: Item, trigger: HTMLElement, point?: { x: number; y: number }) => {
+    if (focusFrame.current !== null) { cancelAnimationFrame(focusFrame.current); focusFrame.current = null }
+    if (itemMenu?.itemId === item.id && !point) { closeItemMenu(); return }
+    const bounds = trigger.getBoundingClientRect()
+    const row = trigger.closest('[data-packing-item-id]')
+    const neighbors = Array.from(row?.parentElement?.querySelectorAll<HTMLElement>('[data-container-menu-trigger]') ?? [])
+    const index = neighbors.findIndex(button => row?.contains(button))
+    setItemMenu({
+      itemId: item.id, trigger,
+      x: point?.x ?? bounds.left, y: point?.y ?? bounds.bottom + 4,
+      aboveY: point?.y ?? bounds.top - 4,
+      fallbacks: [neighbors[index + 1], neighbors[index - 1]].filter(Boolean),
+    })
+  }
+
+  const closeItemMenu = (restoreFocus = true) => {
+    if (focusFrame.current !== null) { cancelAnimationFrame(focusFrame.current); focusFrame.current = null }
+    setItemMenu(null)
+    if (restoreFocus && itemMenu) focusFrame.current = requestAnimationFrame(() => {
+      focusFrame.current = null
+      const target = [itemMenu.trigger, ...itemMenu.fallbacks, planRef.current].find(node => node?.isConnected)
+      target?.focus({ preventScroll: true })
+    })
+  }
 
   const create = (name: string, icon?: string) => {
     const trimmed = name.trim()
@@ -158,7 +193,7 @@ export function PackingPlan({
   }
 
   return (
-    <div>
+    <div ref={planRef} tabIndex={-1}>
       <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
         <span className="mr-0.5 text-xs font-medium text-bark-400">Sorting into:</span>
         {containers.map(c => (
@@ -170,9 +205,9 @@ export function PackingPlan({
         <NewContainerChip value={newName} onChange={setNewName} onCreate={create} />
       </div>
       <p className="mb-2 px-1 text-xs leading-relaxed text-bark-300">
-        Select a container, then tap an item to move it to{' '}
-        {active ? <span className="font-medium text-moss-300">{active.name}</span> : 'the selected container'}, or
-        drag its handle to any container. Tap an item already here to unsort it.
+        Right-click an item or use its move button to choose a container. Tap items to sort into{' '}
+        {active ? <span className="font-medium text-moss-300">{active.name}</span> : 'the selected container'};
+        tap again to unsort. You can also drag the handle.
       </p>
       <p role="status" className="mb-4 min-h-5 px-1 text-xs text-moss-300">{announcement}</p>
 
@@ -188,11 +223,14 @@ export function PackingPlan({
               dimmed
               onItemClick={toggleAssign}
               itemActionLabel={itemActionLabel}
+              onItemMenu={openItemMenu}
+              menuItemId={itemMenu?.itemId}
+              menuId={menuId}
               emptyText={draggingId ? 'Drop here to take it back out.' : 'Everything has a home.'}
             />
             {containers.map(c => {
               const inside = items.filter(i => assignments[i.id] === c.id)
-              const weight = summarizeWeight(inside)
+              const weight = summarizeWeight(inside, trip.worn ? new Set(trip.worn) : undefined)
               const isActive = c.id === activeId
               return (
                 <PlanPanel
@@ -200,7 +238,7 @@ export function PackingPlan({
                   dropId={c.id}
                   heading={`${c.name} · ${inside.length}`}
                   icon={c.icon}
-                  weight={weight.weighed > 0 ? formatSummary(weight) : undefined}
+                  weight={weight.weighed > 0 || weight.worn > 0 ? `${formatSummary(weight)}${weight.worn > 0 ? ` carried ${formatWorn(weight)}` : ''}` : undefined}
                   items={inside}
                   trip={trip}
                   draggingId={draggingId}
@@ -208,6 +246,9 @@ export function PackingPlan({
                   onSelect={() => setActiveId(c.id)}
                   onItemClick={toggleAssign}
                   itemActionLabel={itemActionLabel}
+                  onItemMenu={openItemMenu}
+                  menuItemId={itemMenu?.itemId}
+                  menuId={menuId}
                   renaming={renamingId === c.id}
                   renameValue={renameValue}
                   onRenameChange={setRenameValue}
@@ -266,6 +307,18 @@ export function PackingPlan({
           )}
         </DragOverlay>
       </DndContext>
+      {itemMenu && menuItem && <ContainerMenu
+        id={menuId}
+        item={menuItem}
+        containers={containers}
+        currentId={containerIds.has(assignments[menuItem.id]) ? assignments[menuItem.id] : undefined}
+        anchor={itemMenu}
+        onSelect={containerId => {
+          if ((assignments[menuItem.id] ?? null) !== containerId) assign(menuItem.id, containerId)
+          closeItemMenu()
+        }}
+        onClose={closeItemMenu}
+      />}
       <Modal open={!!removing} onClose={() => setRemovingId(null)} title="Remove container?">
         <p className="text-sm leading-relaxed text-bark-200">
           Remove <strong className="break-words [overflow-wrap:anywhere]">{removing?.name}</strong>? Its items will return to Not sorted yet and stay on your trip checklist.
@@ -329,6 +382,9 @@ function PlanPanel({
   onSelect,
   onItemClick,
   itemActionLabel,
+  onItemMenu,
+  menuItemId,
+  menuId,
   actions,
   emptyText,
   renaming,
@@ -349,6 +405,9 @@ function PlanPanel({
   onSelect?: () => void
   onItemClick: (item: Item) => void
   itemActionLabel: (item: Item) => string
+  onItemMenu: (item: Item, trigger: HTMLElement, point?: { x: number; y: number }) => void
+  menuItemId?: string
+  menuId: string
   actions?: React.ReactNode
   emptyText?: string
   renaming?: boolean
@@ -431,6 +490,9 @@ function PlanPanel({
               lifted={draggingId === item.id}
               onClick={() => onItemClick(item)}
               actionLabel={itemActionLabel(item)}
+              onMenu={(trigger, point) => onItemMenu(item, trigger, point)}
+              menuOpen={menuItemId === item.id}
+              menuId={menuId}
             />
           ))}
         </GlassPanel>
@@ -445,17 +507,35 @@ function PlanRow({
   lifted,
   onClick,
   actionLabel,
+  onMenu,
+  menuOpen,
+  menuId,
 }: {
   item: Item
   packed: boolean
   lifted: boolean
   onClick: () => void
   actionLabel: string
+  onMenu: (trigger: HTMLElement, point?: { x: number; y: number }) => void
+  menuOpen: boolean
+  menuId: string
 }) {
   const { setNodeRef, setActivatorNodeRef, listeners, attributes } = useDraggable({ id: item.id })
+  const menuTrigger = useRef<HTMLButtonElement>(null)
   return (
     <motion.div
       ref={setNodeRef}
+      data-packing-item-id={item.id}
+      onContextMenu={event => {
+        event.preventDefault(); event.stopPropagation()
+        if (menuTrigger.current) onMenu(menuTrigger.current, event.clientX || event.clientY ? { x: event.clientX, y: event.clientY } : undefined)
+      }}
+      onKeyDown={event => {
+        if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+          event.preventDefault(); event.stopPropagation()
+          if (menuTrigger.current) onMenu(menuTrigger.current)
+        }
+      }}
       layout={!lifted}
       layoutId={item.id}
       transition={{ duration: 0.25 }}
@@ -492,6 +572,20 @@ function PlanRow({
           {formatItemWeight(item)}
         </span>
       )}
+      </button>
+      <button
+        ref={menuTrigger}
+        type="button"
+        data-container-menu-trigger
+        aria-label={`Choose container for ${item.name}`}
+        title="Move to container"
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        aria-controls={menuOpen ? menuId : undefined}
+        onClick={event => { event.stopPropagation(); onMenu(event.currentTarget) }}
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-bark-300 hover:bg-moss-500/15 hover:text-moss-200"
+      >
+        <ArrowRightLeft aria-hidden="true" className="h-4 w-4" />
       </button>
     </motion.div>
   )
