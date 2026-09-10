@@ -10,14 +10,13 @@ const results = []
 for (const theme of ['dark', 'light']) {
   for (const width of [1440, 390, 320]) {
     const context = await browser.newContext({ viewport: { width, height: width < 768 ? 844 : 1000 }, colorScheme: theme, isMobile: width < 768, hasTouch: width < 768, reducedMotion: 'reduce' })
-    await context.addInitScript(theme => {
+    await context.addInitScript(() => {
       localStorage.setItem('triplist-welcomed', '1')
-      localStorage.setItem('triplist-theme', theme)
       window.print = () => {
         window.__qaPrint = document.querySelector('.print-sheet')?.innerText
         window.dispatchEvent(new Event('afterprint'))
       }
-    }, theme)
+    })
     const page = await context.newPage()
     page.setDefaultTimeout(10000)
     const errors = []

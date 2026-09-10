@@ -13,10 +13,9 @@ const sizes = { desktop: { width: 1440, height: 1000 }, mobile: { width: 390, he
 for (const theme of ['dark', 'light']) {
   for (const [size, viewport] of Object.entries(sizes)) {
     const context = await browser.newContext({ viewport, colorScheme: theme, isMobile: size === 'mobile', hasTouch: size === 'mobile', reducedMotion: 'reduce' })
-    await context.addInitScript(theme => {
+    await context.addInitScript(() => {
       localStorage.setItem('triplist-welcomed', '1')
-      localStorage.setItem('triplist-theme', theme)
-    }, theme)
+    })
     const page = await context.newPage()
     page.setDefaultTimeout(10000)
     const errors = []

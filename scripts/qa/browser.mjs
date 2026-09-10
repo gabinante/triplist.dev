@@ -38,10 +38,9 @@ export async function newScenario(browser, scenario, { welcome = false } = {}) {
     isMobile: scenario.mobile, hasTouch: scenario.mobile,
     reducedMotion: 'reduce',
   })
-  await context.addInitScript(({ theme, welcome }) => {
-    localStorage.setItem('triplist-theme', theme)
+  await context.addInitScript(welcome => {
     if (!welcome) localStorage.setItem('triplist-welcomed', '1')
-  }, { theme: scenario.theme, welcome })
+  }, welcome)
   const page = await context.newPage()
   page.setDefaultTimeout(10000)
   return { context, page }

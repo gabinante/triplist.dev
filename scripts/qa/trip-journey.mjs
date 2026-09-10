@@ -15,10 +15,9 @@ try {
     const [device, theme] = variant.split('-')
     const viewport = device === 'mobile' ? { width: 390, height: 844 } : { width: 1440, height: 1000 }
     const context = await browser.newContext({ viewport, colorScheme: theme, reducedMotion: 'reduce', isMobile: device === 'mobile', hasTouch: device === 'mobile' })
-    await context.addInitScript(theme => {
+    await context.addInitScript(() => {
       localStorage.setItem('triplist-welcomed', '1')
-      localStorage.setItem('triplist-theme', theme)
-    }, theme)
+    })
     const page = await context.newPage()
     activePage = page
     activeVariant = variant

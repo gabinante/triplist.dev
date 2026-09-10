@@ -6,6 +6,13 @@ const browser = await chromium.launch({ headless: true })
 const results = []
 const navNames = ['Plan My Trip', 'My Trips', 'Gear', 'Lists', 'Trip Styles', 'Friends & Family']
 
+async function expectTheme(page, theme) {
+  await page.waitForFunction(theme =>
+    getComputedStyle(document.documentElement).colorScheme === theme &&
+    getComputedStyle(document.body).backgroundColor === (theme === 'light' ? 'rgb(245, 247, 240)' : 'rgb(22, 24, 20)'), theme)
+  assert.equal(await page.getByRole('button', { name: /Switch to (light|dark) mode/ }).count(), 0)
+}
+
 async function primaryContrast(page) {
   const ratios = await page.locator('.button-primary:enabled').evaluateAll(elements => {
     const canvas = document.createElement('canvas')
@@ -32,9 +39,12 @@ async function primaryContrast(page) {
 try {
   for (const scenario of scenarios) {
     const { context, page } = await newScenario(browser, scenario, { welcome: true })
+    // Previously saved UI choices must never override the computer preference.
+    await context.addInitScript(theme => localStorage.setItem('triplist-theme', theme), scenario.theme === 'light' ? 'dark' : 'light')
     const errors = []
     page.on('pageerror', error => errors.push(error.message))
     await page.goto(baseURL)
+    await expectTheme(page, scenario.theme)
     const welcome = page.getByRole('dialog', { name: 'Welcome to TripList' })
     await welcome.waitFor()
     await noOverflow(page, 'Welcome')
@@ -64,6 +74,17 @@ try {
     assert.equal(await dialog.getByRole('button', { name: 'Add gear', exact: true }).evaluate(el => el === document.activeElement), true)
     await primaryContrast(page)
     await capture(page, 'shared', scenario, 'modal-focus')
+    const savedBeforeThemeChange = await page.evaluate(() => localStorage.getItem('triplist-v1'))
+    const opposite = scenario.theme === 'light' ? 'dark' : 'light'
+    await page.emulateMedia({ colorScheme: opposite })
+    await expectTheme(page, opposite)
+    assert.equal(await dialog.getByLabel('Name', { exact: true }).inputValue(), 'Modal keyboard audit')
+    assert.equal(await page.locator('#root').evaluate(el => el.inert), true)
+    await primaryContrast(page)
+    await capture(page, 'shared', scenario, 'live-system-theme')
+    await page.emulateMedia({ colorScheme: scenario.theme })
+    await expectTheme(page, scenario.theme)
+    assert.equal(await page.evaluate(() => localStorage.getItem('triplist-v1')), savedBeforeThemeChange)
     await page.keyboard.press('Escape')
     await dialog.waitFor({ state: 'hidden' })
     assert.equal(await opener.evaluate(el => el === document.activeElement), true)
@@ -104,19 +125,23 @@ try {
     console.log(JSON.stringify(results.at(-1)))
   }
 
-  // Test saved preference without an init script that would reset it on reload.
+  // System appearance continues to win over a legacy choice, including reload.
   const context = await browser.newContext({ colorScheme: 'light', viewport: { width: 390, height: 844 } })
+  await context.addInitScript(() => localStorage.setItem('triplist-theme', 'dark'))
   const page = await context.newPage()
   await page.goto(baseURL)
-  assert.equal(await page.locator('html').getAttribute('data-theme'), 'light')
+  await expectTheme(page, 'light')
   await page.getByRole('button', { name: 'Start with empty lists instead' }).click()
   await page.getByRole('dialog').waitFor({ state: 'hidden' })
   const blank = await page.evaluate(() => JSON.parse(localStorage.getItem('triplist-v1')))
   assert.equal(blank.items.length, 0)
   assert.ok(blank.tags.length > 0 && blank.wizard.length > 0)
-  await page.getByRole('button', { name: 'Switch to dark mode' }).click()
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await expectTheme(page, 'dark')
   await page.reload()
-  assert.equal(await page.locator('html').getAttribute('data-theme'), 'dark')
+  await expectTheme(page, 'dark')
+  await page.emulateMedia({ colorScheme: 'light' })
+  await expectTheme(page, 'light')
   for (const viewport of [{ width: 320, height: 640 }, { width: 844, height: 390 }]) {
     await page.setViewportSize(viewport)
     for (const name of navNames) {
@@ -124,14 +149,11 @@ try {
       await page.waitForTimeout(200)
       await noOverflow(page, `${name} ${viewport.width}`)
     }
-    const themeButton = page.getByRole('button', { name: /Switch to (light|dark) mode/ })
-    await themeButton.click()
-    const themeBounds = await themeButton.boundingBox()
-    assert.ok(themeBounds.y >= 0 && themeBounds.y + themeBounds.height <= viewport.height, 'Theme control is reachable in short landscape viewports')
+    await expectTheme(page, 'light')
   }
   await context.close()
   await mkdir(`${outputDir}/shared`, { recursive: true })
-  await writeFile(`${outputDir}/shared/results.json`, JSON.stringify({ results, themePersistence: 'passed', emptyWelcome: 'passed', narrowAndLandscape: 'passed' }, null, 2))
+  await writeFile(`${outputDir}/shared/results.json`, JSON.stringify({ results, systemThemeAndLiveChanges: 'passed', legacyPreferenceIgnored: 'passed', emptyWelcome: 'passed', narrowAndLandscape: 'passed' }, null, 2))
 } finally {
   await browser.close()
 }

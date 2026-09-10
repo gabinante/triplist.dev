@@ -12,7 +12,7 @@ Completed a local Playwright audit and implementation pass across all six main p
 | Lists | Create/edit metadata, icons, automatic inclusion, search, add/remove item membership, cancel/save, print-sheet content, deletion preserving gear | 1440×1000, 390×844, and 320px wide, light + dark | [List journey](list-journey.md) |
 | Trip Styles | Create/edit card, icon/list selection, move wizard step, Enter submission, cancel/delete, custom Other card in wizard | 1440×1000 and 390×844, light + dark | [Style journey](styles-journey.md) |
 | Friends & Family / account / sharing | Guest availability, compact account controls, profile/password/notification feedback, friend/request layouts, share forms and recipient states | 1440×1000 and 390×844, light + dark; local API fixtures for signed-in states | [Account journey](account-journey.md) |
-| Shared surfaces | Both welcome choices, system theme default, saved theme after reload, all navigation destinations, active-page labels, dialog focus trap/return/Escape, sign-in/signup/forgot/reset layouts, primary-button contrast | Four main scenarios plus 320×640 and 844×390 navigation checks | `scripts/qa/shared-surfaces.mjs` |
+| Shared surfaces | Both welcome choices, system theme on load/reload and live changes, legacy toggle preferences ignored, all navigation destinations, active-page labels, dialog focus trap/return/Escape, sign-in/signup/forgot/reset layouts, primary-button contrast | Four main scenarios plus 320×640 and 844×390 navigation checks | `scripts/qa/shared-surfaces.mjs` |
 
 All completed journey matrices passed, with no browser page errors in the asserted scenarios. Guest journeys used isolated localStorage contexts. Signed-in account/sharing checks intercepted API requests in Playwright; no real account changes, invitations, or emails were sent.
 
@@ -20,7 +20,7 @@ All completed journey matrices passed, with no browser page errors in the assert
 
 | Problem observed | Result |
 | --- | --- |
-| Light mode did not exist. | Added a full light palette, persistent theme switch, system preference on first visit, and theme-aware surfaces, borders, inputs, status colors, and progress rings. |
+| Light mode did not exist. | Added a full light palette and theme-aware surfaces, borders, inputs, status colors, and progress rings. Appearance now follows the OS/browser preference through CSS, including live changes; the UI toggle and saved override were removed. |
 | Mobile navigation consumed a narrow sidebar and hid destination names. | Labeled bottom navigation, a compact header, full-width content, safe-area padding, and scroll reset when changing pages/trips. |
 | Gear edit/delete controls were invisible until hover — 134 hidden actions in the seeded catalog. | Actions remain visible and have accessible names and 44px targets. |
 | The first wizard Next button was around y=2040 on a 390×844 screen. | Back/Next/Create stay visible above mobile navigation; visible step count and selected states make progress clear. |
