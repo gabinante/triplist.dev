@@ -22,7 +22,7 @@ const results = []
 try {
   for (const theme of ['light', 'dark']) for (const width of [390, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: width === 390 ? 844 : 1000 }, colorScheme: theme, isMobile: width === 390, hasTouch: width === 390, reducedMotion: 'reduce' })
-    await context.addInitScript(theme => { localStorage.setItem('triplist-welcomed', '1'); localStorage.setItem('triplist-theme', theme) }, theme)
+    await context.addInitScript(() => { localStorage.setItem('triplist-welcomed', '1') })
     const page = await context.newPage()
     page.setDefaultTimeout(10000)
     const errors = []

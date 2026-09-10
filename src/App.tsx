@@ -10,7 +10,6 @@ import { FriendsView } from './views/Friends'
 import { AccountSection } from './components/Account'
 import { AuthModal } from './components/AuthModal'
 import { Welcome } from './components/Welcome'
-import { ThemeToggle } from './components/ThemeToggle'
 import { claimShare, useInbox } from './lib/shares'
 import { useFriends } from './lib/friends'
 import { useSession } from './lib/auth-client'
@@ -144,7 +143,6 @@ export default function App() {
               </button>
             ))}
           </nav>
-          <ThemeToggle />
           <AccountSection />
           <div className="hidden border-t border-white/5 px-5 py-4 text-[11px] leading-relaxed text-bark-600 md:block">
             Layered lists for every kind of trip.

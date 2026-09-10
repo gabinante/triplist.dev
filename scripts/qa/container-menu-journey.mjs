@@ -23,11 +23,10 @@ try {
   for (const theme of ['light', 'dark']) for (const width of [390, 1440]) {
     const mobile = width === 390
     const context = await browser.newContext({ viewport: { width, height: mobile ? 844 : 1000 }, isMobile: mobile, hasTouch: mobile, colorScheme: theme, reducedMotion: 'reduce' })
-    await context.addInitScript(({ theme, fixture }) => {
-      localStorage.setItem('triplist-theme', theme)
+    await context.addInitScript(fixture => {
       localStorage.setItem('triplist-welcomed', '1')
       if (!localStorage.getItem('triplist-v1')) localStorage.setItem('triplist-v1', JSON.stringify(fixture))
-    }, { theme, fixture })
+    }, fixture)
     const page = await context.newPage()
     activePage = page
     page.setDefaultTimeout(10000)

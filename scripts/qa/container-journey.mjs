@@ -24,15 +24,14 @@ const fixture = {
 try {
   for (const theme of ['dark', 'light']) {
     for (const [device, viewport] of [['desktop', { width: 1440, height: 1000 }], ['mobile', { width: 390, height: 844 }]]) {
-      const context = await browser.newContext({ viewport, isMobile: device === 'mobile', hasTouch: device === 'mobile' })
+      const context = await browser.newContext({ viewport, colorScheme: theme, isMobile: device === 'mobile', hasTouch: device === 'mobile' })
       const page = await context.newPage()
       const errors = []
       page.on('pageerror', error => errors.push(error.message))
-      await page.addInitScript(({ fixture, theme }) => {
+      await page.addInitScript(fixture => {
         localStorage.setItem('triplist-welcomed', '1')
-        localStorage.setItem('triplist-theme', theme)
         if (!localStorage.getItem('triplist-v1')) localStorage.setItem('triplist-v1', JSON.stringify(fixture))
-      }, { fixture, theme })
+      }, fixture)
       const checkWidth = async stage => {
         const size = await page.evaluate(() => ({ viewport: innerWidth, document: document.documentElement.scrollWidth }))
         assert.ok(size.document <= size.viewport + 1, `${theme}/${device}/${stage}: horizontal overflow ${JSON.stringify(size)}`)
