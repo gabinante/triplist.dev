@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { AlertTriangle, Minus, Package, Pencil, Plus, Search, Shirt, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, CornerDownLeft, Minus, Package, Pencil, Plus, Search, Shirt, Trash2, Upload } from 'lucide-react'
 import { makeId, useStore } from '../store'
 import type { Item, ItemKind, WeightUnit } from '../types'
 import { WEIGHT_UNITS, formatItemWeight } from '../lib/weight'
@@ -77,6 +77,26 @@ function ItemList({ kind, onImport }: { kind: ItemKind; onImport: () => void }) 
   const [filterTag, setFilterTag] = useState<string | null>(null)
   const [editing, setEditing] = useState<Item | null>(null)
   const [creating, setCreating] = useState(false)
+  const [quick, setQuick] = useState('')
+  const [justAdded, setJustAdded] = useState<ReadonlySet<string>>(new Set())
+  const quickId = useId()
+
+  // Quick add: one name per Enter, or several separated by commas. Lists,
+  // weight and stock can be filled in later from the row's pencil.
+  const quickAdd = () => {
+    const names = quick.split(',').map(n => n.trim()).filter(Boolean)
+    if (names.length === 0) return
+    const ids = new Set<string>()
+    for (const name of names) {
+      const item: Item = { id: makeId(name), name, kind, stock: null, tags: [] }
+      dispatch({ type: 'addItem', item })
+      ids.add(item.id)
+    }
+    setJustAdded(ids)
+    setQuick('')
+    setQuery('')
+    setFilterTag(null)
+  }
 
   const ofKind = state.items.filter(i => i.kind === kind)
   const filtered = ofKind.filter(
@@ -112,6 +132,24 @@ function ItemList({ kind, onImport }: { kind: ItemKind; onImport: () => void }) 
           </span>
         </Button>
         <Button variant="ghost" onClick={onImport}><span className="flex items-center gap-1.5"><Upload className="h-4 w-4" /> Import CSV</span></Button>
+      </div>
+
+      <div className="relative mb-4">
+        <label htmlFor={quickId} className="sr-only">
+          Quick add {kind === 'gear' ? 'gear' : kind === 'consumable' ? 'consumables' : 'meals'}
+        </label>
+        <Plus className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-moss-400" />
+        <input
+          id={quickId}
+          className="w-full rounded-xl border border-dashed border-moss-400/30 bg-moss-500/5 py-2.5 pl-9 pr-28 text-sm text-bark-50 placeholder-bark-500 outline-none transition-colors focus:border-moss-400/60 focus:bg-moss-500/10"
+          placeholder={`Quick add ${kind === 'gear' ? 'gear' : kind === 'consumable' ? 'consumables' : 'meals'} — separate several with commas`}
+          value={quick}
+          onChange={e => setQuick(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && quickAdd()}
+        />
+        <span className="pointer-events-none absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1 text-[11px] text-bark-400">
+          <CornerDownLeft className="h-3 w-3" /> Enter to add
+        </span>
       </div>
 
       {outOfStock.length > 0 && (
@@ -155,9 +193,12 @@ function ItemList({ kind, onImport }: { kind: ItemKind; onImport: () => void }) 
         {sorted.map(item => {
           const out = kind === 'consumable' && item.stock === 0
           return (
-            <article
+            <motion.article
               key={item.id}
               aria-label={item.name}
+              initial={justAdded.has(item.id) ? { opacity: 0, backgroundColor: 'rgba(116,137,63,0.3)' } : false}
+              animate={{ opacity: 1, backgroundColor: 'rgba(116,137,63,0)' }}
+              transition={{ duration: 1 }}
               className={`flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-3 transition-colors hover:bg-white/[0.04] sm:px-4 ${
                 out ? 'bg-amber-500/[0.06]' : ''
               }`}
@@ -237,7 +278,7 @@ function ItemList({ kind, onImport }: { kind: ItemKind; onImport: () => void }) 
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
               </div>
-            </article>
+            </motion.article>
           )
         })}
       </GlassPanel>

@@ -343,6 +343,11 @@ export function isWorn(trip: Trip, item: Item): boolean {
   return trip.worn ? trip.worn.includes(item.id) : !!item.worn
 }
 
+/** Ids of the trip's items that are worn — what `summarizeWeight` leaves out of the carried total. */
+export function wornIds(trip: Trip, items: Item[]): Set<string> {
+  return new Set(items.filter(i => isWorn(trip, i)).map(i => i.id))
+}
+
 /**
  * The trip's `worn` list after toggling one item. The first toggle freezes the
  * item defaults into the trip, so editing gear later doesn't silently change

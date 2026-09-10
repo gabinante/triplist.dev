@@ -16,8 +16,8 @@ import {
   Tent,
   Trash2,
 } from 'lucide-react'
-import { ingredientKey, isItemPacked, isWorn, makeId, tripItems, tripProgress, useStore } from '../store'
-import { formatItemWeight, formatSummary, formatWorn, summarizeWeight } from '../lib/weight'
+import { ingredientKey, isItemPacked, makeId, toggleWorn, tripItems, tripProgress, useStore, wornIds } from '../store'
+import { formatSummary, formatWorn, summarizeWeight } from '../lib/weight'
 import type { Item, ItemKind, Trip } from '../types'
 import { Button, Chip, DynamicIcon, GlassPanel, Modal, ProgressRing, inputClass } from '../components/ui'
 import { IngredientsEditor } from '../components/IngredientsEditor'
@@ -30,6 +30,7 @@ import { Inbox, Printer, Share2 } from 'lucide-react'
 import { PrintSheet } from '../components/PrintSheet'
 import type { PrintSheetData } from '../components/PrintSheet'
 import { PackingPlan } from '../components/PackingPlan'
+import { WeightPill } from '../components/WeightPill'
 
 const GROUP_ORDER = [
   'toiletries',
@@ -301,7 +302,8 @@ function TripGrid({
       <div className="grid gap-4 sm:grid-cols-2">
         {state.trips.map((trip, i) => {
           const { packed, total } = tripProgress(trip, state.items)
-          const weight = summarizeWeight(tripItems(trip, state.items), trip.worn ? new Set(trip.worn) : undefined)
+          const tripList = tripItems(trip, state.items)
+          const weight = summarizeWeight(tripList, wornIds(trip, tripList))
           return (
             <motion.div
               key={trip.id}
@@ -400,7 +402,8 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
   const list = tripItems(trip, state.items)
   const { packed, total } = tripProgress(trip, state.items)
   const outOfStock = list.filter(i => i.kind === 'consumable' && i.stock === 0)
-  const weight = summarizeWeight(list, trip.worn ? new Set(trip.worn) : undefined)
+  const worn = wornIds(trip, list)
+  const weight = summarizeWeight(list, worn)
   const containerIds = new Set((trip.containers ?? []).map(c => c.id))
   const unsortedCount = list.filter(i => !containerIds.has(trip.assignments?.[i.id] ?? '')).length
 
@@ -445,6 +448,9 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
       update({ packed: { ...trip.packed, [item.id]: !trip.packed[item.id] } })
     }
   }
+
+  // Worn = on your body, not in the pack. Per trip, seeded from the item's default.
+  const flipWorn = (item: Item) => update({ worn: toggleWorn(trip, list, item.id) })
 
   const removeItem = (item: Item) => {
     setRemovedItem({ item, wasExtra: trip.extras.includes(item.id) })
@@ -549,6 +555,7 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
           </Button>
           <Button
             variant="ghost"
+            disabled={list.length === 0}
             onClick={() => {
               const entries: Record<string, boolean> = {}
               for (const i of list) {
@@ -577,6 +584,7 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
           )}
           <Button
             variant="ghost"
+            disabled={list.length === 0}
             onClick={() =>
               setPrintSheet({
                 title: trip.name,
@@ -682,7 +690,7 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
         transition={{ duration: 0.15 }}
       >
           {view === 'plan' ? (
-            <PackingPlan trip={trip} items={list} onUpdate={update} />
+            <PackingPlan trip={trip} items={list} onUpdate={update} onToggleWorn={flipWorn} />
           ) : (
       <div className="space-y-5">
         {visibleGroups.length === 0 && (
@@ -731,12 +739,7 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                       >
                         {item.name}
                       </span>
-                      {item.weight != null && (
-                        <span className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[11px] tabular-nums text-bark-400">
-                          {formatItemWeight(item)}
-                          {isWorn(trip, item) && ' worn'}
-                        </span>
-                      )}
+                      <WeightPill item={item} worn={worn.has(item.id)} onToggleWorn={() => flipWorn(item)} />
                       {item.kind === 'consumable' && item.stock === 0 ? (
                         <span className="flex shrink-0 items-center gap-1 rounded-full bg-amber-500/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300" title="Out of stock">
                           <AlertTriangle className="h-3 w-3" /><span className="hidden sm:inline">Out of stock</span><span className="sm:hidden">Stock 0</span>
@@ -901,6 +904,21 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
     setQuery('')
   }
 
+  // Enter in the search: add the single match, or create plain gear from the
+  // typed name and add it — no form. The dashed row still opens the full form.
+  const quickAdd = () => {
+    const name = query.trim()
+    if (!name) return
+    if (candidates.length === 1) {
+      add(candidates[0].id, candidates[0].name)
+    } else if (candidates.length === 0) {
+      const item: Item = { id: makeId(name), name, kind: 'gear', stock: null, tags: [] }
+      dispatch({ type: 'addItem', item })
+      add(item.id, item.name)
+    } else return
+    setQuery('')
+  }
+
   const close = () => {
     setCreating(false)
     setQuery('')
@@ -995,9 +1013,10 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
               autoFocus
               aria-label="Search available items"
               className="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 pl-9 pr-3 text-sm text-bark-50 placeholder-bark-500 outline-none focus:border-moss-400/50"
-              placeholder="Search your gear…"
+              placeholder="Search your gear, or type something new and press Enter…"
               value={query}
               onChange={e => setQuery(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && quickAdd()}
             />
           </div>
           <div className="max-h-80 space-y-1 overflow-y-auto">
@@ -1017,9 +1036,12 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
               className="flex w-full items-center gap-2 rounded-lg border border-dashed border-white/15 px-3 py-2.5 text-left text-sm text-bark-300 transition-colors hover:border-moss-400/40 hover:bg-moss-500/10 hover:text-moss-200 cursor-pointer"
             >
               <Plus className="h-4 w-4 text-moss-400" />
-              <span className="flex-1">
-                {query.trim() ? `Create "${query.trim()}" as new gear` : 'Create something new'}
+              <span className="min-w-0 flex-1 break-words">
+                {query.trim() ? `Create "${query.trim()}" with details…` : 'Create something new'}
               </span>
+              {query.trim() && candidates.length === 0 && (
+                <span className="shrink-0 text-[11px] text-bark-400">or press Enter to add it as gear</span>
+              )}
             </button>
           </div>
           <div className="mt-4 flex justify-end"><Button onClick={close}>Done</Button></div>

@@ -16,11 +16,12 @@ import {
 } from '@dnd-kit/core'
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
 import { ArrowRightLeft, Boxes, Check, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react'
-import { isItemPacked, makeId } from '../store'
+import { isItemPacked, makeId, wornIds } from '../store'
 import type { Item, Trip, TripContainer } from '../types'
 import { Button, Chip, DynamicIcon, GlassPanel, Modal } from './ui'
 import { formatItemWeight, formatSummary, formatWorn, summarizeWeight } from '../lib/weight'
 import { ContainerMenu } from './ContainerMenu'
+import { WeightPill } from './WeightPill'
 import type { ContainerMenuAnchor } from './ContainerMenu'
 
 const SUGGESTIONS: { name: string; icon: string }[] = [
@@ -55,10 +56,12 @@ export function PackingPlan({
   trip,
   items,
   onUpdate,
+  onToggleWorn,
 }: {
   trip: Trip
   items: Item[]
   onUpdate: (patch: Partial<Trip>) => void
+  onToggleWorn: (item: Item) => void
 }) {
   const containers = trip.containers ?? []
   const assignments = trip.assignments ?? {}
@@ -87,6 +90,7 @@ export function PackingPlan({
   const containerIds = new Set(containers.map(c => c.id))
   const active = containers.find(c => c.id === activeId) ?? null
   const unsorted = items.filter(i => !assignments[i.id] || !containerIds.has(assignments[i.id]))
+  const worn = wornIds(trip, items)
   const dragging = draggingId ? items.find(i => i.id === draggingId) ?? null : null
   const removing = containers.find(c => c.id === removingId)
   const menuItem = items.find(item => item.id === itemMenu?.itemId)
@@ -219,6 +223,8 @@ export function PackingPlan({
               heading={`Not sorted yet · ${unsorted.length}`}
               items={unsorted}
               trip={trip}
+              worn={worn}
+              onToggleWorn={onToggleWorn}
               draggingId={draggingId}
               dimmed
               onItemClick={toggleAssign}
@@ -230,7 +236,7 @@ export function PackingPlan({
             />
             {containers.map(c => {
               const inside = items.filter(i => assignments[i.id] === c.id)
-              const weight = summarizeWeight(inside, trip.worn ? new Set(trip.worn) : undefined)
+              const weight = summarizeWeight(inside, worn)
               const isActive = c.id === activeId
               return (
                 <PlanPanel
@@ -241,6 +247,8 @@ export function PackingPlan({
                   weight={weight.weighed > 0 || weight.worn > 0 ? `${formatSummary(weight)}${weight.worn > 0 ? ` carried ${formatWorn(weight)}` : ''}` : undefined}
                   items={inside}
                   trip={trip}
+                  worn={worn}
+                  onToggleWorn={onToggleWorn}
                   draggingId={draggingId}
                   selected={isActive}
                   onSelect={() => setActiveId(c.id)}
@@ -376,6 +384,8 @@ function PlanPanel({
   weight,
   items,
   trip,
+  worn,
+  onToggleWorn,
   draggingId,
   selected,
   dimmed,
@@ -399,6 +409,8 @@ function PlanPanel({
   weight?: string
   items: Item[]
   trip: Trip
+  worn: ReadonlySet<string>
+  onToggleWorn: (item: Item) => void
   draggingId: string | null
   selected?: boolean
   dimmed?: boolean
@@ -487,6 +499,8 @@ function PlanPanel({
               key={item.id}
               item={item}
               packed={isItemPacked(trip, item)}
+              worn={worn.has(item.id)}
+              onToggleWorn={() => onToggleWorn(item)}
               lifted={draggingId === item.id}
               onClick={() => onItemClick(item)}
               actionLabel={itemActionLabel(item)}
@@ -504,6 +518,8 @@ function PlanPanel({
 function PlanRow({
   item,
   packed,
+  worn,
+  onToggleWorn,
   lifted,
   onClick,
   actionLabel,
@@ -513,6 +529,8 @@ function PlanRow({
 }: {
   item: Item
   packed: boolean
+  worn: boolean
+  onToggleWorn: () => void
   lifted: boolean
   onClick: () => void
   actionLabel: string
@@ -567,12 +585,8 @@ function PlanRow({
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-white/20" />
       )}
       <span className={`min-w-0 flex-1 break-words text-sm [overflow-wrap:anywhere] ${packed ? 'text-bark-300 line-through' : 'text-bark-100'}`}>{item.name}</span>
-      {item.weight != null && (
-        <span className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-xs tabular-nums text-bark-300">
-          {formatItemWeight(item)}
-        </span>
-      )}
       </button>
+      <WeightPill item={item} worn={worn} onToggleWorn={onToggleWorn} />
       <button
         ref={menuTrigger}
         type="button"
