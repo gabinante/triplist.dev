@@ -173,7 +173,7 @@ export default function App() {
               exit={{ opacity: 0, y: 16 }}
               className="glass fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-2 rounded-2xl px-4 py-3 text-sm text-moss-200"
             >
-              <Check className="h-4 w-4 text-moss-300" /> Email confirmed — you're all set.
+              <Check className="h-4 w-4 text-moss-300" /> Email confirmed — you're signed in.
             </motion.div>
           )}
         </AnimatePresence>

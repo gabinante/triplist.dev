@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LogIn, TentTree, UserPlus, X } from 'lucide-react'
+import { LogIn, MailCheck, TentTree, UserPlus, X } from 'lucide-react'
 import { authClient, signIn, signUp } from '../lib/auth-client'
 import { useStore } from '../store'
 import { Button, inputClass } from './ui'
 
-type AuthMode = 'signin' | 'signup' | 'forgot' | 'reset'
+/** `verify`: account exists but the email isn't confirmed yet — sign-in is refused until it is. */
+type AuthMode = 'signin' | 'signup' | 'forgot' | 'reset' | 'verify'
 
 /** Full-window sign-in / sign-up / password-reset screen. */
 export function AuthModal({
@@ -62,11 +63,31 @@ export function AuthModal({
         setMode('signin')
         return
       }
+      if (mode === 'verify') {
+        const r = await authClient.sendVerificationEmail({ email, callbackURL: '/?verified=1' })
+        if (r.error) throw new Error(r.error.message)
+        setNotice(`Sent another link to ${email}.`)
+        return
+      }
       const result =
         mode === 'signin'
           ? await signIn.email({ email, password })
           : await signUp.email({ email, password, name: name.trim() || email.split('@')[0] })
-      if (result.error) throw new Error(result.error.message ?? undefined)
+      if (result.error) {
+        // Server already re-sent the link (sendOnSignIn); just show the waiting screen.
+        if (result.error.code === 'EMAIL_NOT_VERIFIED') {
+          setPassword('')
+          setMode('verify')
+          return
+        }
+        throw new Error(result.error.message ?? undefined)
+      }
+      if (mode === 'signup') {
+        // No session until the link is clicked; stay open and say what to do.
+        setPassword('')
+        setMode('verify')
+        return
+      }
       onClose()
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : 'Something went wrong — try again.')
@@ -77,7 +98,7 @@ export function AuthModal({
 
   const canSubmit =
     !busy &&
-    (mode === 'forgot'
+    (mode === 'forgot' || mode === 'verify'
       ? email.includes('@')
       : mode === 'reset'
         ? password.length >= 8
@@ -87,6 +108,7 @@ export function AuthModal({
     mode === 'signin' ? 'Welcome back'
     : mode === 'signup' ? 'Create your account'
     : mode === 'forgot' ? 'Reset your password'
+    : mode === 'verify' ? 'Check your email'
     : 'Choose a new password'
 
   const subtext =
@@ -98,7 +120,9 @@ export function AuthModal({
           : 'An account keeps your lists and trips synced across devices — and unlocks sharing.'
         : mode === 'forgot'
           ? "Enter your account email and we'll send you a reset link."
-          : 'Almost done — pick a new password for your account.'
+          : mode === 'verify'
+            ? `We sent a confirmation link to ${email}. Click it and you'll be signed in — nothing works until the address is confirmed.`
+            : 'Almost done — pick a new password for your account.'
 
   // Portal to <body>: ancestors with backdrop-filter (the sidebar) would
   // otherwise trap this fixed overlay in their containing block.
@@ -152,7 +176,12 @@ export function AuthModal({
                       />
                     </div>
                   )}
-                  {mode !== 'reset' && (
+                  {mode === 'verify' && (
+                    <div className="mx-auto w-fit rounded-2xl bg-moss-500/15 p-4 text-moss-300">
+                      <MailCheck className="h-8 w-8" />
+                    </div>
+                  )}
+                  {mode !== 'reset' && mode !== 'verify' && (
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-bark-400">Email</label>
                       <input
@@ -166,7 +195,7 @@ export function AuthModal({
                       />
                     </div>
                   )}
-                  {mode !== 'forgot' && (
+                  {mode !== 'forgot' && mode !== 'verify' && (
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-bark-400">
                         {mode === 'reset' ? 'New password' : 'Password'}
@@ -203,7 +232,12 @@ export function AuthModal({
                       {error}
                     </p>
                   )}
-                  <Button onClick={submit} disabled={!canSubmit} className="w-full !py-3">
+                  <Button
+                    onClick={submit}
+                    disabled={!canSubmit}
+                    variant={mode === 'verify' ? 'ghost' : 'primary'}
+                    className="w-full !py-3"
+                  >
                     <span className="flex items-center justify-center gap-2">
                       {mode === 'signin' ? (
                         <>
@@ -215,6 +249,8 @@ export function AuthModal({
                         </>
                       ) : mode === 'forgot' ? (
                         <>{busy ? 'Sending…' : 'Send reset link'}</>
+                      ) : mode === 'verify' ? (
+                        <>{busy ? 'Sending…' : 'Resend the link'}</>
                       ) : (
                         <>{busy ? 'Saving…' : 'Set new password'}</>
                       )}
@@ -232,7 +268,11 @@ export function AuthModal({
                   }}
                   className="mx-auto mt-6 block text-sm text-bark-400 underline-offset-2 transition-colors hover:text-moss-300 hover:underline cursor-pointer"
                 >
-                  {mode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create an account'}
+                  {mode === 'signup'
+                    ? 'Already have an account? Sign in'
+                    : mode === 'verify'
+                      ? 'Confirmed it? Sign in'
+                      : 'New here? Create an account'}
                 </button>
               )}
             </motion.div>

@@ -15,7 +15,8 @@ That's the whole local stack, auth included — `make db-up` seeds the database 
 auth vars into `.env` automatically. Run `make` alone to list all targets.
 
 No Docker? `make setup` skips the database and the app runs guest-only (auth disabled,
-state in localStorage only). `make db-seed` re-applies the better-auth schema (idempotent);
+state in localStorage only). Sign-in requires a confirmed email; without `RESEND_API_KEY`
+the confirmation link is printed to the server log instead of sent. `make db-seed` re-applies the better-auth schema (idempotent);
 app tables like `trip_share` and `user_state` are created by the server on boot.
 `make start` builds and serves the production bundle on :8080.
 
