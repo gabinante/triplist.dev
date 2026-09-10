@@ -1,6 +1,6 @@
 import { betterAuth } from 'better-auth'
 import pg from 'pg'
-import { escapeHtml as esc, sendEmail } from './email.mjs'
+import { emailEnabled, escapeHtml as esc, sendEmail } from './email.mjs'
 
 // Auth requires the database; without DATABASE_URL (e.g. plain local dev)
 // the server runs guest-only and auth endpoints are disabled.
@@ -43,6 +43,10 @@ export const auth = authEnabled
       },
       emailAndPassword: {
         enabled: true,
+        // Nothing works until the address is confirmed. Shares and friend links
+        // are matched by email, so an unverified account on someone else's
+        // address would otherwise receive their invites.
+        requireEmailVerification: true,
         async sendResetPassword({ user, url }) {
           await sendEmail({
             to: user.email,
@@ -56,11 +60,18 @@ export const auth = authEnabled
       },
       emailVerification: {
         sendOnSignUp: true,
+        // A refused sign-in re-sends the link, so a lost email is never a dead end.
+        sendOnSignIn: true,
         autoSignInAfterVerification: true,
         async sendVerificationEmail({ user, url }) {
           // Land back on the app with a confirmation toast after verifying.
           const verifyUrl = new URL(url)
           verifyUrl.searchParams.set('callbackURL', '/?verified=1')
+          if (!emailEnabled) {
+            // Local dev without Resend: the link is the only way in, so print it.
+            console.log(`[auth] verify ${user.email}: ${verifyUrl}`)
+            return
+          }
           const firstName = (user.name || '').split(' ')[0]
           await sendEmail({
             to: user.email,

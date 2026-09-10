@@ -30,6 +30,42 @@
 
 html {
   color-scheme: dark;
+  --color-bark-400: #a2ac98;
+  --color-bark-500: #9aa58f;
+  --color-bark-600: #929d87;
+  --surface: #242920;
+  --surface-raised: #2c3227;
+  --action: #53682e;
+  --action-hover: #425626;
+  --focus: #b8ce91;
+  --edge: rgba(204, 217, 186, 0.22);
+}
+
+html[data-theme='light'] {
+  color-scheme: light;
+  --color-bark-50: #20291c;
+  --color-bark-100: #2b3526;
+  --color-bark-200: #394531;
+  --color-bark-300: #47543e;
+  --color-bark-400: #526048;
+  --color-bark-500: #5c6853;
+  --color-bark-600: #606c57;
+  --color-bark-700: #bdc7b2;
+  --color-bark-800: #d9e1d0;
+  --color-bark-900: #e9eee3;
+  --color-bark-950: #f5f7f0;
+  --color-moss-100: #354c1c;
+  --color-moss-200: #3b5223;
+  --color-moss-300: #435e26;
+  --color-moss-400: #4b672c;
+  --color-moss-500: #536e30;
+  --color-moss-600: #536e30;
+  --color-moss-900: #e4ebd9;
+  --color-moss-950: #edf2e5;
+  --surface: #fff;
+  --surface-raised: #f0f4e9;
+  --focus: #425f25;
+  --edge: rgba(62, 83, 39, 0.24);
 }
 
 body {
@@ -54,9 +90,9 @@ body {
   inset: 0;
   z-index: -1;
 }
-/* Same canvas, but filling an overlay container (e.g. the auth screen) */
+/* Full-window portal canvas stays in place while account forms scroll. */
 .ambient-fill {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 0;
 }
@@ -69,6 +105,93 @@ body {
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.35),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.modal-surface {
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.3);
+}
+
+.modal-content { scroll-padding-block: 1rem 5rem; }
+
+.button-primary {
+  background: var(--action);
+  border-color: var(--edge);
+  color: #fff;
+}
+.button-primary:hover { background: var(--action-hover); }
+
+.app-sidebar, .app-nav {
+  background: var(--color-bark-950);
+}
+.app-nav { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
+
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.skip-link {
+  position: fixed;
+  left: 1rem;
+  top: -5rem;
+  z-index: 100;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  color: var(--color-bark-50);
+}
+.skip-link:focus { top: 0.5rem; }
+
+/* Palette-aware surfaces retain the existing moss identity in either mode. */
+html[data-theme='light'] .ambient,
+html[data-theme='light'] .ambient-fill {
+  background: radial-gradient(45rem 30rem at 85% -10%, #e1eacf, transparent 70%), var(--color-bark-950);
+}
+html[data-theme='light'] .glass {
+  background: linear-gradient(160deg, #fff, #f8faf4);
+  border-color: var(--edge);
+  box-shadow: 0 4px 20px rgba(49, 66, 28, 0.07), inset 0 1px 0 #fff;
+}
+html[data-theme='light'] .glass-hover:hover {
+  background: #eef3e6;
+  border-color: #83966b;
+}
+html[data-theme='light'] .glass-active {
+  background: #e4edd6 !important;
+  border-color: #657e45 !important;
+  box-shadow: 0 0 0 1px #657e45, 0 4px 20px rgba(49, 66, 28, 0.08);
+}
+html[data-theme='light'] [class*='border-white/'] { border-color: var(--edge); }
+html[data-theme='light'] [class*='bg-white/'] { background-color: rgba(75, 103, 44, 0.055); }
+html[data-theme='light'] input,
+html[data-theme='light'] select,
+html[data-theme='light'] textarea { background-color: #fff; }
+html[data-theme='light'] [class*='text-red-'] { color: #a72b27; }
+html[data-theme='light'] [class*='text-amber-'] { color: #805109; }
+html[data-theme='light'] [class*='text-blue-'] { color: #205b95; }
+html[data-theme='light'] [class*='bg-red-900/'] { background-color: #fcecea; }
+html[data-theme='light'] [class*='bg-moss-500/'][class*='text-moss-50'] {
+  background-color: var(--action);
+  color: #fff;
+}
+html[data-theme='light'] ::-webkit-scrollbar-thumb { background: #bdc8af; }
+html[data-theme='light'] input[type='date']::-webkit-calendar-picker-indicator { filter: none; }
+
+@media (max-width: 767px) {
+  /* Text entry stays at 16px to avoid zooming the viewport on iOS. */
+  input, select, textarea { font-size: 16px !important; }
+  button { min-height: 44px; }
+  button:has(> svg:only-child) { min-width: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 .glass-hover {

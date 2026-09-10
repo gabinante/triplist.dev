@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Check, Clock, HeartHandshake, UserPlus, X } from 'lucide-react'
 import { useAuthAvailable, useSession } from '../lib/auth-client'
@@ -14,6 +14,7 @@ export function FriendsView({ data, onChange }: { data: FriendsData & { refresh?
   const [email, setEmail] = useState('')
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null)
+  const emailId = useId()
 
   if (!authAvailable || !session?.user) {
     return (
@@ -23,10 +24,11 @@ export function FriendsView({ data, onChange }: { data: FriendsData & { refresh?
         </div>
         <h2 className="text-xl font-semibold text-bark-50">Friends & Family</h2>
         <p className="mt-2 mb-6 text-sm text-bark-400">
-          Link up with other TripList users — connected friends can share packing lists with one tap.
-          Sign in to get started.
+          {authAvailable
+            ? 'Connect with other TripList users to share packing lists. Sign in to get started.'
+            : 'Sharing with friends is unavailable in this local guest session. You can still plan trips and organize your gear.'}
         </p>
-        <Button onClick={() => setAuthOpen(true)}>Sign in</Button>
+        {authAvailable && <Button onClick={() => setAuthOpen(true)}>Sign in</Button>}
         <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} />
       </div>
     )
@@ -66,11 +68,13 @@ export function FriendsView({ data, onChange }: { data: FriendsData & { refresh?
       </p>
 
       <GlassPanel className="mb-6 p-5">
-        <label className="mb-1.5 block text-xs font-medium text-bark-400">Connect with someone</label>
-        <div className="flex gap-2">
+        <label htmlFor={emailId} className="mb-1.5 block text-xs font-medium text-bark-400">Connect with someone</label>
+        <div className="flex flex-col gap-2 sm:flex-row">
           <input
+            id={emailId}
+            autoComplete="email"
             type="email"
-            className={inputClass}
+            className={`${inputClass} min-w-0`}
             value={email}
             onChange={e => setEmail(e.target.value)}
             placeholder="their@email.com"
@@ -78,12 +82,13 @@ export function FriendsView({ data, onChange }: { data: FriendsData & { refresh?
           />
           <Button onClick={invite} disabled={!email.includes('@') || busy}>
             <span className="flex items-center gap-1.5">
-              <UserPlus className="h-4 w-4" /> Invite
+              <UserPlus className="h-4 w-4" /> {busy ? 'Sending…' : 'Invite'}
             </span>
           </Button>
         </div>
         {status && (
           <p
+            role={status.ok ? 'status' : 'alert'}
             className={`mt-3 rounded-xl border px-3 py-2 text-sm ${
               status.ok
                 ? 'border-moss-400/30 bg-moss-500/10 text-moss-300'
@@ -111,11 +116,11 @@ export function FriendsView({ data, onChange }: { data: FriendsData & { refresh?
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-moss-500/25 text-sm font-bold text-moss-200">
                   {(req.name || req.email).charAt(0).toUpperCase()}
                 </span>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 basis-40">
                   <p className="truncate text-sm font-semibold text-bark-50">{req.name || req.email}</p>
                   <p className="truncate text-xs text-bark-500">{req.email}</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button onClick={() => respond(req.id, 'accept')}>
                     <span className="flex items-center gap-1.5">
                       <Check className="h-4 w-4" /> Accept
@@ -151,8 +156,9 @@ export function FriendsView({ data, onChange }: { data: FriendsData & { refresh?
                     if (confirm(`Remove ${friend.name || friend.email} from your people?`))
                       removeFriendLink(friend.id).then(onChange)
                   }}
-                  className="rounded p-1.5 text-bark-600 hover:bg-red-900/30 hover:text-red-300 cursor-pointer"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-bark-400 hover:bg-red-900/30 hover:text-red-300 cursor-pointer"
                   title="Remove"
+                  aria-label={`Remove ${friend.name || friend.email} from your people`}
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -169,11 +175,12 @@ export function FriendsView({ data, onChange }: { data: FriendsData & { refresh?
             {data.outgoing.map(req => (
               <div key={req.id} className="flex items-center gap-3 px-4 py-2.5">
                 <Clock className="h-4 w-4 shrink-0 text-bark-500" />
-                <span className="flex-1 text-sm text-bark-300">{req.email}</span>
+                <span className="min-w-0 flex-1 break-all text-sm text-bark-300">{req.email}</span>
                 <button
                   onClick={() => removeFriendLink(req.id).then(onChange)}
-                  className="rounded p-1.5 text-bark-600 hover:bg-red-900/30 hover:text-red-300 cursor-pointer"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-bark-400 hover:bg-red-900/30 hover:text-red-300 cursor-pointer"
                   title="Cancel request"
+                  aria-label={`Cancel request to ${req.email}`}
                 >
                   <X className="h-4 w-4" />
                 </button>

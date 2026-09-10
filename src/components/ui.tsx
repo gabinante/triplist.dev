@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useId } from 'react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import {
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useDialog } from '../lib/useDialog'
 
 const ICONS: Record<string, LucideIcon> = {
   Armchair, Backpack, Bed, Bike, Briefcase, Building2, Car, Coffee, Compass, CookingPot, Dog,
@@ -35,24 +36,27 @@ export function Button({
   variant = 'primary',
   className = '',
   disabled,
+  type = 'button',
 }: {
   children: ReactNode
   onClick?: () => void
   variant?: 'primary' | 'ghost' | 'danger'
   className?: string
   disabled?: boolean
+  type?: 'button' | 'submit' | 'reset'
 }) {
   const styles = {
     primary:
-      'bg-moss-500/80 hover:bg-moss-400/90 text-moss-50 border border-moss-400/40 shadow-[0_0_20px_rgba(143,166,92,0.25)]',
+      'button-primary border shadow-sm',
     ghost: 'glass glass-hover text-bark-100',
     danger: 'bg-red-900/40 hover:bg-red-800/50 text-red-200 border border-red-500/30',
   }
   return (
     <button
+      type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-xl px-4 py-2 text-sm font-medium transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none cursor-pointer ${styles[variant]} ${className}`}
+      className={`min-h-11 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none cursor-pointer ${styles[variant]} ${className}`}
     >
       {children}
     </button>
@@ -70,16 +74,19 @@ export function Chip({
   onClick?: () => void
   className?: string
 }) {
+  const classes = `inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all duration-150 ${
+    onClick ? 'cursor-pointer' : 'cursor-default'
+  } ${active
+    ? 'border-moss-400/60 bg-moss-500/25 text-moss-200 shadow-[0_0_12px_rgba(143,166,92,0.2)]'
+    : 'border-white/10 bg-white/5 text-bark-300 hover:border-white/20'
+  } ${className}`
+  if (!onClick) return <span className={classes}>{children}</span>
   return (
     <button
+      type="button"
+      aria-pressed={active}
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-all duration-150 ${
-        onClick ? 'cursor-pointer' : 'cursor-default'
-      } ${
-        active
-          ? 'border-moss-400/60 bg-moss-500/25 text-moss-200 shadow-[0_0_12px_rgba(143,166,92,0.2)]'
-          : 'border-white/10 bg-white/5 text-bark-300 hover:border-white/20'
-      } ${className}`}
+      className={classes}
     >
       {children}
     </button>
@@ -93,13 +100,13 @@ export function ProgressRing({ packed, total, size = 44 }: { packed: number; tot
   return (
     <div className="relative shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={4} />
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--edge)" strokeWidth={4} />
         <circle
           cx={size / 2}
           cy={size / 2}
           r={r}
           fill="none"
-          stroke={pct === 1 ? '#aabd7f' : '#8fa65c'}
+          stroke="var(--color-moss-400)"
           strokeWidth={4}
           strokeLinecap="round"
           strokeDasharray={c}
@@ -125,12 +132,8 @@ export function Modal({
   title: string
   children: ReactNode
 }) {
-  useEffect(() => {
-    if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  const dialogRef = useDialog(open, onClose)
+  const titleId = useId()
 
   // Portal to <body> so backdrop-filter ancestors can't trap the overlay.
   return createPortal(
@@ -140,24 +143,29 @@ export function Modal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-4"
           onClick={onClose}
         >
           <motion.div
+            ref={dialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            tabIndex={-1}
             initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 12 }}
             transition={{ duration: 0.18 }}
-            className="glass rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6"
+            className="modal-surface flex w-full max-w-lg max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-2xl sm:max-h-[85dvh]"
             onClick={e => e.stopPropagation()}
           >
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-bark-50">{title}</h2>
-              <button onClick={onClose} className="rounded-lg p-1 text-bark-400 hover:bg-white/10 hover:text-bark-100 cursor-pointer">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-2 sm:px-6 sm:py-3">
+              <h2 id={titleId} className="min-w-0 break-words text-lg font-semibold text-bark-50">{title}</h2>
+              <button type="button" aria-label="Close dialog" onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-bark-300 hover:bg-white/10 hover:text-bark-100 cursor-pointer">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            {children}
+            <div className="modal-content min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6">{children}</div>
           </motion.div>
         </motion.div>
       )}

@@ -70,11 +70,12 @@ export function AccountSection() {
 
   if (!session?.user) {
     return (
-      <div className="border-t border-white/5 px-2 py-3 md:px-3">
+      <div className="px-1 md:border-t md:border-white/5 md:px-3 md:py-3">
         <button
           onClick={() => setModalOpen(true)}
           className="flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-sm font-medium text-bark-400 transition-all hover:bg-white/5 hover:text-bark-100 cursor-pointer"
           title="Sign in"
+          aria-label="Sign in"
         >
           <LogIn className="h-[18px] w-[18px] shrink-0" />
           <span className="hidden md:inline">Sign in</span>
@@ -86,9 +87,9 @@ export function AccountSection() {
 
   const initial = (session.user.name || session.user.email || '?').charAt(0).toUpperCase()
   return (
-    <div className="border-t border-white/5 px-2 py-3 md:px-3">
-      <div className="flex items-center gap-3 rounded-xl px-3 py-2">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-moss-500/30 text-sm font-bold text-moss-200">
+    <div className="px-1 md:border-t md:border-white/5 md:px-3 md:py-3">
+      <div className="flex items-center gap-1 rounded-xl md:gap-2 md:py-2">
+        <span className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full bg-moss-500/30 text-sm font-bold text-moss-200 md:flex">
           {initial}
         </span>
         <div className="hidden min-w-0 flex-1 md:block">
@@ -97,15 +98,17 @@ export function AccountSection() {
         </div>
         <button
           onClick={() => setPrefsOpen(true)}
-          className="rounded-lg p-1.5 text-bark-500 hover:bg-white/10 hover:text-bark-100 cursor-pointer"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-bark-400 hover:bg-white/10 hover:text-bark-100 cursor-pointer"
           title="Preferences"
+          aria-label="Preferences"
         >
           <Settings className="h-4 w-4" />
         </button>
         <button
           onClick={() => signOut()}
-          className="rounded-lg p-1.5 text-bark-500 hover:bg-white/10 hover:text-bark-100 cursor-pointer"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-bark-400 hover:bg-white/10 hover:text-bark-100 cursor-pointer"
           title="Sign out"
+          aria-label="Sign out"
         >
           <LogOut className="h-4 w-4" />
         </button>

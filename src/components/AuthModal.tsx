@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { LogIn, TentTree, UserPlus, X } from 'lucide-react'
+import { LogIn, MailCheck, TentTree, UserPlus, X } from 'lucide-react'
 import { authClient, signIn, signUp } from '../lib/auth-client'
 import { useStore } from '../store'
 import { Button, inputClass } from './ui'
+import { useDialog } from '../lib/useDialog'
 
-type AuthMode = 'signin' | 'signup' | 'forgot' | 'reset'
+/** `verify`: account exists but the email isn't confirmed yet — sign-in is refused until it is. */
+type AuthMode = 'signin' | 'signup' | 'forgot' | 'reset' | 'verify'
 
 /** Full-window sign-in / sign-up / password-reset screen. */
 export function AuthModal({
@@ -30,6 +32,7 @@ export function AuthModal({
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const dialogRef = useDialog(open, onClose)
 
   useEffect(() => {
     if (open) {
@@ -62,11 +65,31 @@ export function AuthModal({
         setMode('signin')
         return
       }
+      if (mode === 'verify') {
+        const r = await authClient.sendVerificationEmail({ email, callbackURL: '/?verified=1' })
+        if (r.error) throw new Error(r.error.message)
+        setNotice(`Sent another link to ${email}.`)
+        return
+      }
       const result =
         mode === 'signin'
           ? await signIn.email({ email, password })
           : await signUp.email({ email, password, name: name.trim() || email.split('@')[0] })
-      if (result.error) throw new Error(result.error.message ?? undefined)
+      if (result.error) {
+        // Server already re-sent the link (sendOnSignIn); just show the waiting screen.
+        if (result.error.code === 'EMAIL_NOT_VERIFIED') {
+          setPassword('')
+          setMode('verify')
+          return
+        }
+        throw new Error(result.error.message ?? undefined)
+      }
+      if (mode === 'signup') {
+        // No session until the link is clicked; stay open and say what to do.
+        setPassword('')
+        setMode('verify')
+        return
+      }
       onClose()
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : 'Something went wrong — try again.')
@@ -77,7 +100,7 @@ export function AuthModal({
 
   const canSubmit =
     !busy &&
-    (mode === 'forgot'
+    (mode === 'forgot' || mode === 'verify'
       ? email.includes('@')
       : mode === 'reset'
         ? password.length >= 8
@@ -87,6 +110,7 @@ export function AuthModal({
     mode === 'signin' ? 'Welcome back'
     : mode === 'signup' ? 'Create your account'
     : mode === 'forgot' ? 'Reset your password'
+    : mode === 'verify' ? 'Check your email'
     : 'Choose a new password'
 
   const subtext =
@@ -98,7 +122,9 @@ export function AuthModal({
           : 'An account keeps your lists and trips synced across devices — and unlocks sharing.'
         : mode === 'forgot'
           ? "Enter your account email and we'll send you a reset link."
-          : 'Almost done — pick a new password for your account.'
+          : mode === 'verify'
+            ? `We sent a confirmation link to ${email}. Click it and you'll be signed in — nothing works until the address is confirmed.`
+            : 'Almost done — pick a new password for your account.'
 
   // Portal to <body>: ancestors with backdrop-filter (the sidebar) would
   // otherwise trap this fixed overlay in their containing block.
@@ -106,14 +132,21 @@ export function AuthModal({
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={heading}
+          tabIndex={-1}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-50 overflow-y-auto"
+          className="fixed inset-0 z-50 overflow-y-auto bg-bark-950"
         >
           <div className="ambient-fill" />
           <button
+            type="button"
+            aria-label="Close sign in"
             onClick={onClose}
             className="fixed right-5 top-5 z-10 rounded-xl p-2 text-bark-400 transition-colors hover:bg-white/10 hover:text-bark-100 cursor-pointer"
           >
@@ -136,7 +169,7 @@ export function AuthModal({
                 </span>
               </div>
 
-              <div className="glass rounded-3xl p-8">
+              <div className="glass rounded-3xl p-5 sm:p-8">
                 <h1 className="text-2xl font-bold text-bark-50">{heading}</h1>
                 <p className="mt-2 mb-6 text-sm leading-relaxed text-bark-400">{subtext}</p>
 
@@ -145,6 +178,8 @@ export function AuthModal({
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-bark-400">Name</label>
                       <input
+                        aria-label="Name"
+                        autoComplete="name"
                         className={inputClass}
                         value={name}
                         onChange={e => setName(e.target.value)}
@@ -152,12 +187,20 @@ export function AuthModal({
                       />
                     </div>
                   )}
-                  {mode !== 'reset' && (
+                  {mode === 'verify' && (
+                    <div className="mx-auto w-fit rounded-2xl bg-moss-500/15 p-4 text-moss-300">
+                      <MailCheck className="h-8 w-8" />
+                    </div>
+                  )}
+                  {mode !== 'reset' && mode !== 'verify' && (
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-bark-400">Email</label>
                       <input
                         autoFocus
                         type="email"
+                        aria-label="Email"
+                        autoComplete="email"
+                        inputMode="email"
                         className={inputClass}
                         value={email}
                         onChange={e => setEmail(e.target.value)}
@@ -166,13 +209,15 @@ export function AuthModal({
                       />
                     </div>
                   )}
-                  {mode !== 'forgot' && (
+                  {mode !== 'forgot' && mode !== 'verify' && (
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-bark-400">
                         {mode === 'reset' ? 'New password' : 'Password'}
                       </label>
                       <input
                         type="password"
+                        aria-label={mode === 'reset' ? 'New password' : 'Password'}
+                        autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                         className={inputClass}
                         value={password}
                         onChange={e => setPassword(e.target.value)}
@@ -194,16 +239,21 @@ export function AuthModal({
                     </div>
                   )}
                   {notice && (
-                    <p className="rounded-xl border border-moss-400/30 bg-moss-500/10 px-3 py-2 text-sm text-moss-300">
+                    <p role="status" className="rounded-xl border border-moss-400/30 bg-moss-500/10 px-3 py-2 text-sm text-moss-300">
                       {notice}
                     </p>
                   )}
                   {error && (
-                    <p className="rounded-xl border border-red-500/30 bg-red-900/20 px-3 py-2 text-sm text-red-300">
+                    <p role="alert" className="rounded-xl border border-red-500/30 bg-red-900/20 px-3 py-2 text-sm text-red-300">
                       {error}
                     </p>
                   )}
-                  <Button onClick={submit} disabled={!canSubmit} className="w-full !py-3">
+                  <Button
+                    onClick={submit}
+                    disabled={!canSubmit}
+                    variant={mode === 'verify' ? 'ghost' : 'primary'}
+                    className="w-full !py-3"
+                  >
                     <span className="flex items-center justify-center gap-2">
                       {mode === 'signin' ? (
                         <>
@@ -215,6 +265,8 @@ export function AuthModal({
                         </>
                       ) : mode === 'forgot' ? (
                         <>{busy ? 'Sending…' : 'Send reset link'}</>
+                      ) : mode === 'verify' ? (
+                        <>{busy ? 'Sending…' : 'Resend the link'}</>
                       ) : (
                         <>{busy ? 'Saving…' : 'Set new password'}</>
                       )}
@@ -232,7 +284,11 @@ export function AuthModal({
                   }}
                   className="mx-auto mt-6 block text-sm text-bark-400 underline-offset-2 transition-colors hover:text-moss-300 hover:underline cursor-pointer"
                 >
-                  {mode === 'signup' ? 'Already have an account? Sign in' : 'New here? Create an account'}
+                  {mode === 'signup'
+                    ? 'Already have an account? Sign in'
+                    : mode === 'verify'
+                      ? 'Confirmed it? Sign in'
+                      : 'New here? Create an account'}
                 </button>
               )}
             </motion.div>

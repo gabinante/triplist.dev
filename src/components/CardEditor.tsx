@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { makeId, useStore } from '../store'
 import type { WizardCard } from '../types'
 import { Button, Chip, DynamicIcon, ICON_CHOICES, Modal, inputClass } from './ui'
@@ -23,6 +23,7 @@ export function CardEditor({
   lockStep?: boolean
 }) {
   const { state, dispatch } = useStore()
+  const fieldId = useId()
   const [title, setTitle] = useState('')
   const [subtitle, setSubtitle] = useState('')
   const [icon, setIcon] = useState('Package')
@@ -42,6 +43,7 @@ export function CardEditor({
   if (!open && loadedFor !== null) setLoadedFor(null)
 
   const save = () => {
+    if (!title.trim() || !state.wizard.some(step => step.id === targetStep)) return
     const saved: WizardCard = {
       id: card?.id ?? makeId(title),
       title: title.trim(),
@@ -61,16 +63,16 @@ export function CardEditor({
 
   return (
     <Modal open={open} onClose={onClose} title={card ? 'Edit card' : 'New card'}>
-      <div className="space-y-4">
+      <form className="space-y-4" onSubmit={e => { e.preventDefault(); save() }}>
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-bark-400">Title</label>
-            <input autoFocus className={inputClass} value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Ski Weekend" />
+            <label htmlFor={`${fieldId}-title`} className="mb-1.5 block text-xs font-medium text-bark-300">Title</label>
+            <input id={`${fieldId}-title`} autoFocus required className={inputClass} value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Ski Weekend" />
           </div>
           {!lockStep && (
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-bark-400">Wizard step</label>
-              <select className={inputClass} value={targetStep} onChange={e => setTargetStep(e.target.value)}>
+              <label htmlFor={`${fieldId}-step`} className="mb-1.5 block text-xs font-medium text-bark-300">Wizard step</label>
+              <select id={`${fieldId}-step`} className={inputClass} value={targetStep} onChange={e => setTargetStep(e.target.value)}>
                 {state.wizard.map(s => (
                   <option key={s.id} value={s.id} className="bg-bark-900">
                     {s.title}
@@ -81,17 +83,21 @@ export function CardEditor({
           )}
         </div>
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-bark-400">Subtitle</label>
-          <input className={inputClass} value={subtitle} onChange={e => setSubtitle(e.target.value)} placeholder="Short description shown on the card" />
+          <label htmlFor={`${fieldId}-subtitle`} className="mb-1.5 block text-xs font-medium text-bark-300">Subtitle <span className="font-normal text-bark-400">(optional)</span></label>
+          <input id={`${fieldId}-subtitle`} className={inputClass} value={subtitle} onChange={e => setSubtitle(e.target.value)} placeholder="Short description shown on the card" />
         </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-bark-400">Icon</label>
+        <fieldset>
+          <legend className="mb-1.5 block text-xs font-medium text-bark-300">Icon</legend>
           <div className="flex flex-wrap gap-1.5">
             {ICON_CHOICES.map(name => (
               <button
                 key={name}
+                type="button"
                 onClick={() => setIcon(name)}
-                className={`rounded-lg border p-2 transition-all cursor-pointer ${
+                aria-label={`Use ${name} icon`}
+                aria-pressed={icon === name}
+                title={name}
+                className={`flex h-11 w-11 items-center justify-center rounded-lg border transition-all cursor-pointer ${
                   icon === name
                     ? 'border-moss-400/60 bg-moss-500/25 text-moss-200'
                     : 'border-white/10 bg-white/5 text-bark-400 hover:border-white/25'
@@ -101,27 +107,29 @@ export function CardEditor({
               </button>
             ))}
           </div>
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-bark-400">Adds these lists to the trip</label>
+        </fieldset>
+        <fieldset>
+          <legend className="mb-1.5 block text-xs font-medium text-bark-300">Adds these lists to the trip</legend>
+          <p className="mb-2 text-xs leading-relaxed text-bark-400">{tags.length ? `${tags.length} ${tags.length === 1 ? 'list selected' : 'lists selected'}.` : 'Choose lists to include when this card is selected.'}</p>
           <div className="flex flex-wrap gap-1.5">
             {state.tags.map(tag => (
               <Chip
                 key={tag.id}
                 active={tags.includes(tag.id)}
+                className="max-w-full text-left"
                 onClick={() => setTags(tags.includes(tag.id) ? tags.filter(t => t !== tag.id) : [...tags, tag.id])}
               >
-                <DynamicIcon name={tag.icon} className="h-3 w-3" />
-                {tag.name}
+                <DynamicIcon name={tag.icon} className="h-3 w-3 shrink-0" />
+                <span className="min-w-0 break-words [overflow-wrap:anywhere]">{tag.name}</span>
               </Chip>
             ))}
           </div>
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
+        </fieldset>
+        <div className="flex flex-wrap justify-end gap-2 border-t border-white/10 pt-4">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={title.trim() === ''}>{card ? 'Save' : 'Create card'}</Button>
+          <Button type="submit" disabled={title.trim() === ''}>{card ? 'Save' : 'Create card'}</Button>
         </div>
-      </div>
+      </form>
     </Modal>
   )
 }

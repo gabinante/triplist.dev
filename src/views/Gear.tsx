@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { AlertTriangle, Minus, Package, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { makeId, useStore } from '../store'
@@ -28,8 +28,10 @@ export function GearView() {
           ).map(t => (
             <button
               key={t.id}
+              type="button"
+              aria-pressed={tab === t.id}
               onClick={() => setTab(t.id)}
-              className={`relative rounded-lg px-4 py-1.5 text-sm font-medium transition-all cursor-pointer ${
+              className={`relative min-h-11 rounded-lg px-3 py-1.5 text-sm font-medium transition-all cursor-pointer sm:px-4 ${
                 tab === t.id ? 'bg-moss-500/70 text-moss-50 shadow' : 'text-bark-400 hover:text-bark-200'
               }`}
             >
@@ -44,8 +46,7 @@ export function GearView() {
         </div>
       </div>
       <p className="mb-6 text-sm text-bark-400">
-        Gear, consumables, and meals all live on lists. Picking cards in the trip wizard adds their
-        lists — and everything on them — to your trip's packing list.
+        Manage what you own, track supplies, and plan meals. Add items to lists to include them when you plan a trip.
       </p>
       <AnimatePresence mode="wait">
         <motion.div
@@ -72,7 +73,7 @@ function ItemList({ kind }: { kind: ItemKind }) {
   const ofKind = state.items.filter(i => i.kind === kind)
   const filtered = ofKind.filter(
     i =>
-      i.name.toLowerCase().includes(query.toLowerCase()) &&
+      i.name.toLowerCase().includes(query.trim().toLowerCase()) &&
       (filterTag === null || i.tags.includes(filterTag)),
   )
   const sorted =
@@ -90,6 +91,7 @@ function ItemList({ kind }: { kind: ItemKind }) {
         <div className="relative min-w-52 flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-bark-500" />
           <input
+            aria-label={kind === 'gear' ? 'Search gear' : kind === 'consumable' ? 'Search consumables' : 'Search meals'}
             className="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 pl-9 pr-3 text-sm text-bark-50 placeholder-bark-500 outline-none focus:border-moss-400/50"
             placeholder={kind === 'gear' ? 'Search gear…' : kind === 'consumable' ? 'Search consumables…' : 'Search meals…'}
             value={query}
@@ -112,7 +114,11 @@ function ItemList({ kind }: { kind: ItemKind }) {
         </div>
       )}
 
-      <div className="mb-5 flex flex-wrap gap-1.5">
+      <select className={`${inputClass} mb-4 sm:hidden`} aria-label="Filter by list" value={filterTag ?? ''} onChange={e => setFilterTag(e.target.value || null)}>
+        <option value="">All lists · {ofKind.length} items</option>
+        {state.tags.filter(tag => ofKind.some(item => item.tags.includes(tag.id))).map(tag => <option key={tag.id} value={tag.id}>{tag.name} · {ofKind.filter(item => item.tags.includes(tag.id)).length}</option>)}
+      </select>
+      <div className="mb-5 hidden flex-wrap gap-1.5 sm:flex">
         <Chip active={filterTag === null} onClick={() => setFilterTag(null)}>
           All · {ofKind.length}
         </Chip>
@@ -132,49 +138,54 @@ function ItemList({ kind }: { kind: ItemKind }) {
 
       <GlassPanel className="divide-y divide-white/5 overflow-hidden">
         {sorted.length === 0 && (
-          <p className="py-10 text-center text-sm text-bark-500">
-            {kind === 'gear' ? 'No gear matches.' : kind === 'consumable' ? 'No consumables match.' : 'No meals match.'}
-          </p>
+          <div className="px-4 py-10 text-center text-sm text-bark-300">
+            <p>{ofKind.length === 0 ? `No ${kind === 'gear' ? 'gear' : kind === 'consumable' ? 'consumables' : 'meals'} yet. Add your first item to get started.` : 'No items match your search and list filter.'}</p>
+            {ofKind.length > 0 && <Button variant="ghost" className="mt-3" onClick={() => { setQuery(''); setFilterTag(null) }}>Clear filters</Button>}
+          </div>
         )}
         {sorted.map(item => {
           const out = kind === 'consumable' && item.stock === 0
           return (
-            <div
+            <article
               key={item.id}
-              className={`group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.04] ${
+              aria-label={item.name}
+              className={`flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-3 transition-colors hover:bg-white/[0.04] sm:px-4 ${
                 out ? 'bg-amber-500/[0.06]' : ''
               }`}
             >
-              {out ? (
-                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
-              ) : (
-                <Package className="h-4 w-4 shrink-0 text-bark-500" />
-              )}
-              <span className={`flex-1 text-sm ${out ? 'text-amber-100' : 'text-bark-100'}`}>
-                {item.name}
-              </span>
+              <div className="min-w-0 flex-1 basis-36">
+                <div className="flex items-start gap-2">
+                  {out ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" /> : <Package className="mt-0.5 h-4 w-4 shrink-0 text-bark-400" />}
+                  <h2 className={`min-w-0 break-words text-sm font-medium ${out ? 'text-amber-100' : 'text-bark-100'}`}>{item.name}</h2>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-6 text-xs text-bark-300">
+                  {item.weight != null && <span className="rounded-full bg-white/5 px-2 py-0.5 tabular-nums">{formatItemWeight(item)}</span>}
+                  {kind === 'gear' && item.stock != null && <span className="rounded-full bg-white/5 px-2 py-0.5">Owned: {item.stock}</span>}
+                  {kind === 'meal' && (item.ingredients?.length ?? 0) > 0 && <span className="rounded-full bg-white/5 px-2 py-0.5">{item.ingredients!.length} ingredients</span>}
+                  {out && <span className="rounded-full bg-amber-500/20 px-2 py-0.5 font-medium text-amber-300">Out of stock</span>}
+                  {item.tags.map(tagId => {
+                    const tag = state.tags.find(t => t.id === tagId)
+                    return tag ? <span key={tagId} className="rounded-full bg-moss-500/10 px-2 py-0.5 text-moss-300">{tag.name}</span> : null
+                  })}
+                  {item.tags.length === 0 && <span>No lists yet</span>}
+                </div>
+              </div>
 
-              {item.weight != null && (
-                <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] tabular-nums text-bark-500">
-                  {formatItemWeight(item)}
-                </span>
-              )}
-
-              {kind === 'consumable' ? (
-                <div className="flex items-center gap-1">
-                  {out && (
-                    <span className="mr-1.5 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
-                      Out of stock
-                    </span>
-                  )}
+              {kind === 'consumable' && (
+                <div className="order-last flex w-full items-center justify-end gap-1 border-t border-white/5 pt-2 sm:order-none sm:w-auto sm:border-0 sm:pt-0">
+                  <span className="mr-auto text-xs text-bark-300 sm:mr-2">In stock</span>
                   <button
+                    type="button"
+                    aria-label={`Decrease stock of ${item.name}`}
                     onClick={() => setStock(item, (item.stock ?? 0) - 1)}
-                    disabled={item.stock === null || item.stock === 0}
-                    className="rounded-lg border border-white/10 bg-white/5 p-1 text-bark-300 transition-colors hover:border-white/25 hover:text-bark-100 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                    disabled={item.stock == null || item.stock === 0}
+                    className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-bark-200 transition-colors hover:border-white/25 hover:text-bark-100 disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
                   >
                     <Minus className="h-3.5 w-3.5" />
                   </button>
                   <span
+                    aria-label={`${item.stock ?? 'Untracked'} in stock`}
+                    aria-live="polite"
                     className={`w-9 text-center text-sm font-semibold tabular-nums ${
                       out ? 'text-amber-300' : 'text-bark-100'
                     }`}
@@ -182,51 +193,38 @@ function ItemList({ kind }: { kind: ItemKind }) {
                     {item.stock ?? '—'}
                   </span>
                   <button
+                    type="button"
+                    aria-label={`Increase stock of ${item.name}`}
                     onClick={() => setStock(item, (item.stock ?? 0) + 1)}
-                    className="rounded-lg border border-white/10 bg-white/5 p-1 text-bark-300 transition-colors hover:border-moss-400/50 hover:text-moss-200 cursor-pointer"
+                    className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-bark-200 transition-colors hover:border-moss-400/50 hover:text-moss-200 cursor-pointer"
                   >
                     <Plus className="h-3.5 w-3.5" />
                   </button>
                 </div>
-              ) : kind === 'meal' ? (
-                (item.ingredients?.length ?? 0) > 0 && (
-                  <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-bark-500">
-                    {item.ingredients!.length} ingredients
-                  </span>
-                )
-              ) : (
-                item.stock !== null && (
-                  <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-bark-500">
-                    ×{item.stock}
-                  </span>
-                )
               )}
-
-              <div className="hidden flex-wrap justify-end gap-1 lg:flex">
-                {item.tags.map(tagId => {
-                  const tag = state.tags.find(t => t.id === tagId)
-                  return tag ? (
-                    <span key={tagId} className="rounded-full bg-moss-500/10 px-2 py-0.5 text-[10px] text-moss-300">
-                      {tag.name}
-                    </span>
-                  ) : null
-                })}
-              </div>
+              <div className="flex shrink-0 gap-1">
               <button
+                type="button"
+                aria-label={`Edit ${item.name}`}
+                title={`Edit ${item.name}`}
                 onClick={() => setEditing(item)}
-                className="rounded p-1.5 text-bark-500 opacity-0 transition-opacity hover:bg-white/10 hover:text-bark-100 group-hover:opacity-100 cursor-pointer"
+                className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 text-bark-300 transition-colors hover:bg-white/10 hover:text-bark-100 cursor-pointer"
               >
                 <Pencil className="h-3.5 w-3.5" />
               </button>
               <button
+                type="button"
+                aria-label={`Delete ${item.name}`}
+                title={`Delete ${item.name}`}
                 onClick={() => {
                   if (confirm(`Delete "${item.name}"?`)) dispatch({ type: 'deleteItem', id: item.id })
                 }}
-                className="rounded p-1.5 text-bark-500 opacity-0 transition-opacity hover:bg-red-900/30 hover:text-red-300 group-hover:opacity-100 cursor-pointer"
+                className="flex h-11 w-11 items-center justify-center rounded-lg text-bark-400 transition-colors hover:bg-red-900/30 hover:text-red-300 cursor-pointer"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
-            </div>
+              </div>
+            </article>
           )
         })}
       </GlassPanel>
@@ -263,7 +261,9 @@ function ItemModal({
   const [ingredients, setIngredients] = useState<string[]>([])
   const [weight, setWeight] = useState('')
   const [weightUnit, setWeightUnit] = useState<WeightUnit>('g')
+  const [listQuery, setListQuery] = useState('')
   const [loadedFor, setLoadedFor] = useState<string | null>(null)
+  const formId = useId()
 
   // sync form state when the modal target changes
   const targetKey = item?.id ?? (open ? 'new' : null)
@@ -276,17 +276,25 @@ function ItemModal({
     setIngredients(item?.ingredients ?? [])
     setWeight(item?.weight?.toString() ?? '')
     setWeightUnit(item?.weightUnit ?? 'g')
+    setListQuery('')
   }
   if (!open && loadedFor !== null) setLoadedFor(null)
 
+  const parsedWeight = weight.trim() === '' ? null : Number(weight)
+  const parsedStock = stock.trim() === '' ? null : Number(stock)
+  const weightInvalid = parsedWeight !== null && (!Number.isFinite(parsedWeight) || parsedWeight < 0)
+  const stockInvalid = parsedStock !== null && (!Number.isInteger(parsedStock) || parsedStock < 0)
+  const canSave = name.trim() !== '' && !weightInvalid && !stockInvalid
+  const visibleTags = state.tags.filter(tag => tag.name.toLowerCase().includes(listQuery.trim().toLowerCase()))
+
   const save = () => {
-    const parsedWeight = weight.trim() === '' ? NaN : Number(weight)
-    const hasWeight = Number.isFinite(parsedWeight) && parsedWeight > 0
+    if (!canSave) return
+    const hasWeight = parsedWeight !== null
     const parsed: Item = {
       id: item?.id ?? makeId(name),
       name: name.trim(),
       kind,
-      stock: stock.trim() === '' ? null : Number(stock),
+      stock: parsedStock,
       tags,
       ingredients: kind === 'meal' && ingredients.length > 0 ? ingredients : undefined,
       weight: hasWeight ? parsedWeight : undefined,
@@ -297,57 +305,65 @@ function ItemModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={item ? 'Edit item' : `Add ${kind === 'gear' ? 'gear' : 'consumable'}`}>
-      <div className="space-y-4">
-        <div className="grid grid-cols-3 gap-3">
-          <div className="col-span-2">
-            <label className="mb-1.5 block text-xs font-medium text-bark-400">Name</label>
-            <input autoFocus className={inputClass} value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Headlamp" />
+    <Modal open={open} onClose={onClose} title={item ? 'Edit item' : `Add ${kind}`}>
+      <form className="space-y-4" onSubmit={e => { e.preventDefault(); save() }}>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="sm:col-span-2">
+            <label htmlFor={`${formId}-name`} className="mb-1.5 block text-xs font-medium text-bark-300">Name</label>
+            <input id={`${formId}-name`} autoFocus required className={inputClass} value={name} onChange={e => setName(e.target.value)} placeholder={kind === 'meal' ? 'e.g. Trail breakfast' : kind === 'consumable' ? 'e.g. Stove fuel' : 'e.g. Headlamp'} />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-bark-400">
+            <label htmlFor={`${formId}-stock`} className="mb-1.5 block text-xs font-medium text-bark-300">
               {kind === 'consumable' ? 'In stock' : 'Qty owned'}
             </label>
-            <input className={inputClass} type="number" min="0" value={stock} onChange={e => setStock(e.target.value)} placeholder="—" />
+            <input id={`${formId}-stock`} className={inputClass} type="number" inputMode="numeric" min="0" step="1" value={stock} onChange={e => setStock(e.target.value)} placeholder="Not tracked" aria-invalid={stockInvalid} aria-describedby={`${formId}-stock-help`} />
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <p id={`${formId}-stock-help`} className={`text-xs ${stockInvalid ? 'text-red-300' : 'text-bark-400'}`}>{stockInvalid ? 'Enter a whole number of 0 or more.' : 'Leave quantity blank if you do not track stock.'}</p>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-bark-400">Weight</label>
+            <label htmlFor={`${formId}-weight`} className="mb-1.5 block text-xs font-medium text-bark-300">Weight per item</label>
             <input
+              id={`${formId}-weight`}
               className={inputClass}
               type="number"
+              inputMode="decimal"
               min="0"
               step="any"
               value={weight}
               onChange={e => setWeight(e.target.value)}
-              placeholder="—"
+              placeholder="Not weighed"
+              aria-invalid={weightInvalid}
+              aria-describedby={`${formId}-weight-help`}
             />
           </div>
-          <div className="col-span-2">
-            <label className="mb-1.5 block text-xs font-medium text-bark-400">Unit</label>
-            <div className="flex flex-wrap gap-1.5 pt-1.5">
+          <fieldset>
+            <legend className="mb-1.5 block text-xs font-medium text-bark-300">Unit</legend>
+            <div className="grid grid-cols-2 gap-1.5 sm:flex">
               {WEIGHT_UNITS.map(u => (
                 <Chip key={u} active={weightUnit === u} onClick={() => setWeightUnit(u)}>
                   {u}
                 </Chip>
               ))}
             </div>
-          </div>
+          </fieldset>
         </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-bark-400">Type</label>
+        <p id={`${formId}-weight-help`} className={`text-xs ${weightInvalid ? 'text-red-300' : 'text-bark-400'}`}>{weightInvalid ? 'Enter a weight of 0 or more.' : 'Leave blank for unknown weight. The number stays the same when you choose a unit.'}</p>
+        <fieldset>
+          <legend className="mb-1.5 block text-xs font-medium text-bark-300">Type</legend>
           <div className="flex flex-wrap gap-1.5">
             <Chip active={kind === 'gear'} onClick={() => setKind('gear')}>Gear — durable, owned</Chip>
             <Chip active={kind === 'consumable'} onClick={() => setKind('consumable')}>Consumable — gets used up</Chip>
             <Chip active={kind === 'meal'} onClick={() => setKind('meal')}>Meal — menu planning</Chip>
           </div>
-        </div>
+        </fieldset>
         {kind === 'meal' && <IngredientsEditor value={ingredients} onChange={setIngredients} />}
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-bark-400">On lists</label>
+        <fieldset>
+          <legend className="mb-1.5 block text-xs font-medium text-bark-300">On lists · {tags.length} selected</legend>
+          <p className="mb-2 text-xs text-bark-400">Choose the lists that should include this item.</p>
+          {state.tags.length > 8 && <input className={`${inputClass} mb-2`} aria-label="Find a list" placeholder="Find a list…" value={listQuery} onChange={e => setListQuery(e.target.value)} />}
           <div className="flex flex-wrap gap-1.5">
-            {state.tags.map(tag => (
+            {visibleTags.map(tag => (
               <Chip
                 key={tag.id}
                 active={tags.includes(tag.id)}
@@ -358,12 +374,13 @@ function ItemModal({
               </Chip>
             ))}
           </div>
-        </div>
-        <div className="flex justify-end gap-2 pt-2">
+          {visibleTags.length === 0 && <p className="text-sm text-bark-400">{state.tags.length === 0 ? 'Create a list from the Lists page to organize this item.' : 'No lists match your search.'}</p>}
+        </fieldset>
+        <div className="sticky -bottom-6 z-10 -mx-1 flex justify-end gap-2 border-t border-white/10 bg-bark-950 px-1 py-3">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={name.trim() === ''}>{item ? 'Save' : 'Add'}</Button>
+          <Button type="submit" disabled={!canSave}>{item ? 'Save changes' : `Add ${kind}`}</Button>
         </div>
-      </div>
+      </form>
     </Modal>
   )
 }

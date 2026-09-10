@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { Check, Send } from 'lucide-react'
 import type { ListSnapshot, ShareKind, TripSnapshot } from '../lib/shares'
 import { share } from '../lib/shares'
@@ -22,6 +22,7 @@ export function ShareModal({
   buildSnapshot: () => TripSnapshot | ListSnapshot
 }) {
   const { friends } = useFriends()
+  const id = useId()
   const [email, setEmail] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
@@ -56,7 +57,7 @@ export function ShareModal({
           <div className="mx-auto w-fit rounded-2xl bg-moss-500/20 p-4 text-moss-300">
             <Check className="h-8 w-8" />
           </div>
-          <p className="text-sm text-bark-200">
+          <p role="status" className="break-words text-sm text-bark-200">
             {sent.emailed
               ? `Invite sent to ${email.trim()} — they can accept it from the email or from their My Trips inbox.`
               : `Invite saved. When ${email.trim()} signs in with that email, it'll be waiting in their My Trips inbox.`}
@@ -75,7 +76,7 @@ export function ShareModal({
               <label className="mb-1.5 block text-xs font-medium text-bark-400">Your people</label>
               <div className="flex flex-wrap gap-1.5">
                 {friends.map(f => (
-                  <Chip key={f.id} active={email === f.email} onClick={() => setEmail(f.email)}>
+                  <Chip key={f.id} active={email === f.email} onClick={() => setEmail(f.email)} className="max-w-full break-all text-left">
                     {f.name || f.email}
                   </Chip>
                 ))}
@@ -83,8 +84,10 @@ export function ShareModal({
             </div>
           )}
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-bark-400">Their email</label>
+            <label htmlFor={`${id}-email`} className="mb-1.5 block text-xs font-medium text-bark-400">Their email</label>
             <input
+              id={`${id}-email`}
+              autoComplete="email"
               autoFocus
               type="email"
               className={inputClass}
@@ -94,8 +97,9 @@ export function ShareModal({
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-bark-400">Message (optional)</label>
+            <label htmlFor={`${id}-message`} className="mb-1.5 block text-xs font-medium text-bark-400">Message (optional)</label>
             <input
+              id={`${id}-message`}
               className={inputClass}
               value={message}
               onChange={e => setMessage(e.target.value)}
@@ -104,7 +108,7 @@ export function ShareModal({
             />
           </div>
           {error && (
-            <p className="rounded-xl border border-red-500/30 bg-red-900/20 px-3 py-2 text-sm text-red-300">{error}</p>
+            <p role="alert" className="rounded-xl border border-red-500/30 bg-red-900/20 px-3 py-2 text-sm text-red-300">{error}</p>
           )}
           <div className="flex justify-end gap-2 pt-1">
             <Button variant="ghost" onClick={reset}>Cancel</Button>

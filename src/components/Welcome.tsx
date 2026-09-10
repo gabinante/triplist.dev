@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ListChecks, Pencil, Shapes, TentTree } from 'lucide-react'
 import { useStore } from '../store'
 import { Button } from './ui'
+import { useDialog } from '../lib/useDialog'
 
 const BEATS = [
   {
@@ -25,6 +26,7 @@ const BEATS = [
 /** One-time first-visit explainer of the layered-lists premise. */
 export function Welcome({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { dispatch } = useStore()
+  const dialogRef = useDialog(open, onClose)
 
   const startBlank = () => {
     dispatch({ type: 'startBlank' })
@@ -35,11 +37,16 @@ export function Welcome({ open, onClose }: { open: boolean; onClose: () => void 
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Welcome to TripList"
+          tabIndex={-1}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.25 }}
-          className="fixed inset-0 z-50 overflow-y-auto"
+          className="fixed inset-0 z-50 overflow-y-auto bg-bark-950"
         >
           <div className="ambient-fill" />
           <div className="relative z-[1] flex min-h-full flex-col items-center justify-center px-4 py-12">

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, ArrowRight, Check, Compass, Plus } from 'lucide-react'
 import { makeId, tripItems, useStore } from '../store'
@@ -70,6 +70,11 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
   const finalStep = boundedIndex === steps.length
   const step = steps[boundedIndex]
 
+  useEffect(() => {
+    // Each step starts at its question, including when returning from review.
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [boundedIndex])
+
   const previewTrip: Trip = useMemo(
     () => ({
       id: 'preview',
@@ -101,6 +106,7 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
     : (step.optional ?? false) || (picks[step.id]?.length ?? 0) > 0
 
   const createTrip = () => {
+    if (!name.trim()) return
     const trip: Trip = {
       id: makeId(name),
       name: name.trim(),
@@ -118,7 +124,10 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
   return (
     <div className="mx-auto max-w-3xl">
       {/* progress */}
-      <div className="mb-8 flex items-center justify-center gap-2">
+      <p className="mb-2 text-center text-xs font-medium text-bark-400" aria-live="polite">
+        Step {boundedIndex + 1} of {steps.length + 1} · {finalStep ? 'Review & create' : step.title}
+      </p>
+      <div className="mb-6 flex items-center justify-center gap-2" aria-hidden="true">
         {[...steps.map(s => s.id), 'details'].map((id, i) => (
           <div
             key={id}
@@ -186,7 +195,9 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
                     <button
                       key={card.id}
                       onClick={() => toggleCard(card.id)}
-                      className={`glass glass-hover rounded-2xl p-5 text-left cursor-pointer ${active ? 'glass-active' : ''}`}
+                      aria-pressed={active}
+                      aria-label={card.title}
+                      className={`glass glass-hover rounded-2xl p-4 text-left cursor-pointer sm:p-5 ${active ? 'glass-active' : ''}`}
                     >
                       <div className="flex items-start justify-between">
                         <div
@@ -240,8 +251,11 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
               <GlassPanel className="p-6">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-bark-400">Trip name</label>
+                    <label htmlFor="new-trip-name" className="mb-1.5 block text-xs font-medium text-bark-400">Trip name</label>
                     <input
+                      id="new-trip-name"
+                      autoComplete="off"
+                      required
                       autoFocus
                       className={inputClass}
                       placeholder="e.g. Fall trip to Fallen Leaf Lake"
@@ -251,8 +265,8 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
                     />
                   </div>
                   <div>
-                    <label className="mb-1.5 block text-xs font-medium text-bark-400">Date (optional)</label>
-                    <input type="date" className={inputClass} value={date} onChange={e => setDate(e.target.value)} />
+                    <label htmlFor="new-trip-date" className="mb-1.5 block text-xs font-medium text-bark-400">Date (optional)</label>
+                    <input id="new-trip-date" type="date" className={inputClass} value={date} onChange={e => setDate(e.target.value)} />
                   </div>
                 </div>
                 <div className="mt-5 border-t border-white/10 pt-4">
@@ -292,13 +306,13 @@ export function PlanWizard({ onDone }: { onDone: (tripId: string) => void }) {
         </motion.div>
       </AnimatePresence>
 
-      <div className="mt-8 flex items-center justify-between">
+      <div className="sticky bottom-24 z-10 mt-6 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-white/10 bg-bark-950/95 p-3 shadow-lg backdrop-blur-xl md:bottom-4">
         <Button variant="ghost" onClick={() => setStepIndex(boundedIndex - 1)} className={boundedIndex === 0 ? 'invisible' : ''}>
           <span className="flex items-center gap-1.5">
             <ArrowLeft className="h-4 w-4" /> Back
           </span>
         </Button>
-        <div className="text-xs text-bark-500">
+        <div className="text-xs text-bark-400">
           {chosenTags.length > 0 && !finalStep && (
             <span className="flex items-center gap-1.5">
               <Compass className="h-3.5 w-3.5 text-moss-400" />
