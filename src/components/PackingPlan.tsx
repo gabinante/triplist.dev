@@ -15,10 +15,10 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion'
-import { Boxes, Check, GripVertical, Pencil, Plus, Trash2 } from 'lucide-react'
+import { Boxes, Check, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { isItemPacked, makeId } from '../store'
 import type { Item, Trip, TripContainer } from '../types'
-import { Chip, DynamicIcon, GlassPanel } from './ui'
+import { Button, Chip, DynamicIcon, GlassPanel, Modal } from './ui'
 import { formatItemWeight, formatSummary, summarizeWeight } from '../lib/weight'
 
 const SUGGESTIONS: { name: string; icon: string }[] = [
@@ -65,6 +65,8 @@ export function PackingPlan({
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+  const [announcement, setAnnouncement] = useState('')
 
   // A small movement threshold keeps plain taps working as taps; on touch a
   // short hold distinguishes a drag from a scroll.
@@ -77,6 +79,7 @@ export function PackingPlan({
   const active = containers.find(c => c.id === activeId) ?? null
   const unsorted = items.filter(i => !assignments[i.id] || !containerIds.has(assignments[i.id]))
   const dragging = draggingId ? items.find(i => i.id === draggingId) ?? null : null
+  const removing = containers.find(c => c.id === removingId)
 
   const create = (name: string, icon?: string) => {
     const trimmed = name.trim()
@@ -84,6 +87,7 @@ export function PackingPlan({
     const container: TripContainer = { id: makeId(trimmed), name: trimmed, icon: icon ?? guessIcon(trimmed) }
     onUpdate({ containers: [...containers, container] })
     setActiveId(container.id)
+    setAnnouncement(`${trimmed} created. Select an item to move it here.`)
   }
 
   const assign = (itemId: string, containerId: string | null) => {
@@ -91,6 +95,9 @@ export function PackingPlan({
     if (containerId === null) delete next[itemId]
     else next[itemId] = containerId
     onUpdate({ assignments: next })
+    const item = items.find(i => i.id === itemId)
+    const destination = containers.find(c => c.id === containerId)
+    setAnnouncement(`${item?.name ?? 'Item'} moved to ${destination?.name ?? 'Not sorted yet'}.`)
   }
 
   const toggleAssign = (item: Item) => {
@@ -98,12 +105,19 @@ export function PackingPlan({
     assign(item.id, assignments[item.id] === active.id ? null : active.id)
   }
 
+  const itemActionLabel = (item: Item) =>
+    assignments[item.id] === active?.id
+      ? `Unsort ${item.name}`
+      : `Move ${item.name} to ${active?.name ?? 'a container'}`
+
   const remove = (id: string) => {
     onUpdate({
       containers: containers.filter(c => c.id !== id),
       assignments: Object.fromEntries(Object.entries(assignments).filter(([, c]) => c !== id)),
     })
     if (activeId === id) setActiveId(containers.find(c => c.id !== id)?.id ?? null)
+    setRemovingId(null)
+    setAnnouncement('Container removed. Its items are now in Not sorted yet.')
   }
 
   const rename = () => {
@@ -133,7 +147,7 @@ export function PackingPlan({
         <div className="flex flex-wrap justify-center gap-1.5">
           {SUGGESTIONS.map(s => (
             <Chip key={s.name} onClick={() => create(s.name, s.icon)}>
-              <DynamicIcon name={s.icon} className="h-3 w-3" />
+              <DynamicIcon name={s.icon} className="h-4 w-4 shrink-0" />
               {s.name}
             </Chip>
           ))}
@@ -148,18 +162,19 @@ export function PackingPlan({
       <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
         <span className="mr-0.5 text-xs font-medium text-bark-400">Sorting into:</span>
         {containers.map(c => (
-          <Chip key={c.id} active={c.id === activeId} onClick={() => setActiveId(c.id)}>
-            <DynamicIcon name={c.icon} className="h-3 w-3" />
-            {c.name}
+          <Chip key={c.id} active={c.id === activeId} onClick={() => setActiveId(c.id)} className="min-h-11 max-w-full text-left">
+            <DynamicIcon name={c.icon} className="h-4 w-4 shrink-0" />
+            <span className="min-w-0 break-words [overflow-wrap:anywhere]">{c.name}</span>
           </Chip>
         ))}
         <NewContainerChip value={newName} onChange={setNewName} onCreate={create} />
       </div>
-      <p className="mb-5 px-1 text-[11px] text-bark-500">
-        Tap an item to put it in{' '}
+      <p className="mb-2 px-1 text-xs leading-relaxed text-bark-300">
+        Select a container, then tap an item to move it to{' '}
         {active ? <span className="font-medium text-moss-300">{active.name}</span> : 'the selected container'}, or
-        drag it onto any container. Tap a container to select it.
+        drag its handle to any container. Tap an item already here to unsort it.
       </p>
+      <p role="status" className="mb-4 min-h-5 px-1 text-xs text-moss-300">{announcement}</p>
 
       <DndContext sensors={sensors} collisionDetection={collision} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setDraggingId(null)}>
         <LayoutGroup>
@@ -172,6 +187,7 @@ export function PackingPlan({
               draggingId={draggingId}
               dimmed
               onItemClick={toggleAssign}
+              itemActionLabel={itemActionLabel}
               emptyText={draggingId ? 'Drop here to take it back out.' : 'Everything has a home.'}
             />
             {containers.map(c => {
@@ -191,10 +207,12 @@ export function PackingPlan({
                   selected={isActive}
                   onSelect={() => setActiveId(c.id)}
                   onItemClick={toggleAssign}
+                  itemActionLabel={itemActionLabel}
                   renaming={renamingId === c.id}
                   renameValue={renameValue}
                   onRenameChange={setRenameValue}
                   onRenameCommit={rename}
+                  onRenameCancel={() => setRenamingId(null)}
                   actions={
                     <>
                       <button
@@ -203,18 +221,20 @@ export function PackingPlan({
                           setRenamingId(c.id)
                           setRenameValue(c.name)
                         }}
-                        className="rounded p-1 text-bark-500 hover:bg-white/10 hover:text-bark-100 cursor-pointer"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-bark-300 hover:bg-white/10 hover:text-bark-100 cursor-pointer"
                         title="Rename"
+                        aria-label={`Rename ${c.name}`}
                       >
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
                       <button
                         onClick={e => {
                           e.stopPropagation()
-                          remove(c.id)
+                          setRemovingId(c.id)
                         }}
-                        className="rounded p-1 text-bark-500 hover:bg-red-900/30 hover:text-red-300 cursor-pointer"
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-bark-300 hover:bg-red-900/30 hover:text-red-300 cursor-pointer"
                         title="Remove container"
+                        aria-label={`Remove ${c.name}`}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -246,6 +266,15 @@ export function PackingPlan({
           )}
         </DragOverlay>
       </DndContext>
+      <Modal open={!!removing} onClose={() => setRemovingId(null)} title="Remove container?">
+        <p className="text-sm leading-relaxed text-bark-200">
+          Remove <strong className="break-words [overflow-wrap:anywhere]">{removing?.name}</strong>? Its items will return to Not sorted yet and stay on your trip checklist.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <Button variant="ghost" onClick={() => setRemovingId(null)}>Cancel</Button>
+          <Button variant="danger" onClick={() => removing && remove(removing.id)}>Remove container</Button>
+        </div>
+      </Modal>
     </div>
   )
 }
@@ -261,27 +290,29 @@ function NewContainerChip({
 }) {
   if (value === null)
     return (
-      <Chip onClick={() => onChange('')} className="border-dashed">
+      <Chip onClick={() => onChange('')} className="min-h-11 border-dashed">
         <Plus className="h-3 w-3" /> Container
       </Chip>
     )
   const commit = () => {
+    if (!value.trim()) return
     onCreate(value)
     onChange(null)
   }
   return (
-    <input
-      autoFocus
-      className="w-36 rounded-full border border-moss-400/50 bg-white/5 px-3 py-1 text-xs text-bark-50 outline-none placeholder-bark-500"
-      placeholder="e.g. Blue tote…"
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      onKeyDown={e => {
-        if (e.key === 'Enter') commit()
-        if (e.key === 'Escape') onChange(null)
-      }}
-      onBlur={() => (value.trim() ? commit() : onChange(null))}
-    />
+    <form className="flex w-full max-w-sm items-center gap-1 rounded-xl border border-moss-400/50 bg-white/5 p-1" onSubmit={e => { e.preventDefault(); commit() }}>
+      <input
+        autoFocus
+        aria-label="Container name"
+        className="min-h-11 min-w-0 flex-1 rounded-lg bg-transparent px-2 text-base text-bark-50 outline-none placeholder-bark-400 sm:text-sm"
+        placeholder="e.g. Blue tote…"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Escape') onChange(null) }}
+      />
+      <button type="submit" disabled={!value.trim()} className="min-h-11 shrink-0 rounded-lg bg-moss-500/25 px-3 text-sm font-medium text-moss-200 disabled:opacity-40">Add</button>
+      <button type="button" onClick={() => onChange(null)} aria-label="Cancel new container" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-bark-300 hover:bg-white/10"><X className="h-4 w-4" /></button>
+    </form>
   )
 }
 
@@ -297,12 +328,14 @@ function PlanPanel({
   dimmed,
   onSelect,
   onItemClick,
+  itemActionLabel,
   actions,
   emptyText,
   renaming,
   renameValue,
   onRenameChange,
   onRenameCommit,
+  onRenameCancel,
 }: {
   dropId: string
   heading: string
@@ -315,46 +348,48 @@ function PlanPanel({
   dimmed?: boolean
   onSelect?: () => void
   onItemClick: (item: Item) => void
+  itemActionLabel: (item: Item) => string
   actions?: React.ReactNode
   emptyText?: string
   renaming?: boolean
   renameValue?: string
   onRenameChange?: (v: string) => void
   onRenameCommit?: () => void
+  onRenameCancel?: () => void
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: dropId })
 
   return (
     <div
+      data-container-id={dropId}
       onClick={onSelect}
       className={`rounded-2xl transition-all duration-200 ${onSelect ? 'cursor-pointer' : ''} ${
         selected ? '' : dimmed ? 'opacity-80' : 'opacity-90 hover:opacity-100'
       }`}
     >
-      <div className="mb-2 flex items-center gap-2 px-1">
-        {icon && (
-          <DynamicIcon name={icon} className={`h-4 w-4 ${selected ? 'text-moss-300' : 'text-moss-500'}`} />
-        )}
+      <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 px-1">
         {renaming ? (
-          <input
-            autoFocus
-            className="rounded-lg border border-moss-400/50 bg-white/5 px-2 py-0.5 text-sm text-bark-50 outline-none"
-            value={renameValue}
-            onClick={e => e.stopPropagation()}
-            onChange={e => onRenameChange?.(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && onRenameCommit?.()}
-            onBlur={onRenameCommit}
-          />
+          <form className="flex w-full min-w-0 items-center gap-1" onClick={e => e.stopPropagation()} onSubmit={e => { e.preventDefault(); onRenameCommit?.() }}>
+            <input
+              autoFocus
+              aria-label="Container name"
+              className="min-h-11 min-w-0 flex-1 rounded-lg border border-moss-400/50 bg-white/5 px-2 text-base text-bark-50 outline-none sm:text-sm"
+              value={renameValue}
+              onChange={e => onRenameChange?.(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Escape') onRenameCancel?.() }}
+            />
+            <button type="submit" disabled={!renameValue?.trim()} aria-label="Save container name" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-moss-500/25 text-moss-200 disabled:opacity-40"><Check className="h-4 w-4" /></button>
+            <button type="button" onClick={onRenameCancel} aria-label="Cancel rename" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-bark-300 hover:bg-white/10"><X className="h-4 w-4" /></button>
+          </form>
         ) : (
-          <h3
-            className={`text-sm font-semibold uppercase tracking-wider transition-colors ${
-              selected ? 'text-moss-200' : dimmed ? 'text-bark-400' : 'text-bark-300'
-            }`}
-          >
-            {heading}
-          </h3>
+          <>
+            <div className="flex w-full min-w-0 items-start gap-2">
+              {icon && <DynamicIcon name={icon} className={`mt-0.5 h-4 w-4 shrink-0 ${selected ? 'text-moss-300' : 'text-moss-400'}`} />}
+              <h3 className={`min-w-0 break-words text-sm font-semibold uppercase tracking-wider transition-colors [overflow-wrap:anywhere] ${selected ? 'text-moss-200' : 'text-bark-300'}`}>{heading}</h3>
+            </div>
+          </>
         )}
-        {weight && <span className="text-xs tabular-nums text-bark-500">{weight}</span>}
+        {weight && <span className="text-xs tabular-nums text-bark-300">{weight}</span>}
         <AnimatePresence>
           {selected && (
             <motion.span
@@ -369,7 +404,7 @@ function PlanPanel({
           )}
         </AnimatePresence>
         <span className="flex-1" />
-        {actions}
+        {!renaming && actions}
       </div>
       <div ref={setNodeRef}>
         <GlassPanel
@@ -384,7 +419,7 @@ function PlanPanel({
           }`}
         >
           {items.length === 0 && emptyText && (
-            <p className={`px-4 py-4 text-center text-xs ${selected || isOver ? 'text-moss-300/80' : 'text-bark-500'}`}>
+            <p className={`px-4 py-4 text-center text-xs ${selected || isOver ? 'text-moss-300' : 'text-bark-300'}`}>
               {emptyText}
             </p>
           )}
@@ -395,6 +430,7 @@ function PlanPanel({
               packed={isItemPacked(trip, item)}
               lifted={draggingId === item.id}
               onClick={() => onItemClick(item)}
+              actionLabel={itemActionLabel(item)}
             />
           ))}
         </GlassPanel>
@@ -408,41 +444,55 @@ function PlanRow({
   packed,
   lifted,
   onClick,
+  actionLabel,
 }: {
   item: Item
   packed: boolean
   lifted: boolean
   onClick: () => void
+  actionLabel: string
 }) {
-  const { setNodeRef, listeners, attributes } = useDraggable({ id: item.id })
+  const { setNodeRef, setActivatorNodeRef, listeners, attributes } = useDraggable({ id: item.id })
   return (
     <motion.div
       ref={setNodeRef}
-      {...listeners}
-      {...attributes}
       layout={!lifted}
       layoutId={item.id}
       transition={{ duration: 0.25 }}
-      onClick={e => {
-        e.stopPropagation()
-        onClick()
-      }}
-      className={`flex cursor-grab touch-none items-center gap-3 px-4 py-2 transition-colors hover:bg-white/[0.04] active:cursor-grabbing ${
+      className={`flex items-center gap-1 px-1 transition-colors hover:bg-white/[0.04] ${
         lifted ? 'opacity-25' : ''
       }`}
     >
-      <GripVertical className="-ml-1 h-3.5 w-3.5 shrink-0 text-bark-600" />
+      <button
+        ref={setActivatorNodeRef}
+        {...listeners}
+        {...attributes}
+        tabIndex={-1}
+        aria-hidden="true"
+        title={`Drag ${item.name}`}
+        onClick={e => e.stopPropagation()}
+        className="flex min-h-11 w-11 shrink-0 touch-none cursor-grab items-center justify-center rounded-lg text-bark-400 active:cursor-grabbing"
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        aria-label={actionLabel}
+        onClick={e => { e.stopPropagation(); onClick() }}
+        className="flex min-h-11 min-w-0 flex-1 touch-pan-y items-center gap-2 rounded-lg py-2 pr-3 text-left"
+      >
       {packed ? (
         <Check className="h-3.5 w-3.5 shrink-0 text-moss-400" />
       ) : (
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-white/20" />
       )}
-      <span className={`flex-1 text-sm ${packed ? 'text-bark-500 line-through' : 'text-bark-100'}`}>{item.name}</span>
+      <span className={`min-w-0 flex-1 break-words text-sm [overflow-wrap:anywhere] ${packed ? 'text-bark-300 line-through' : 'text-bark-100'}`}>{item.name}</span>
       {item.weight != null && (
-        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] tabular-nums text-bark-500">
+        <span className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-xs tabular-nums text-bark-300">
           {formatItemWeight(item)}
         </span>
       )}
+      </button>
     </motion.div>
   )
 }

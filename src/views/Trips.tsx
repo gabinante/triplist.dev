@@ -9,6 +9,7 @@ import {
   CheckCheck,
   ListChecks,
   Minus,
+  Pencil,
   Plus,
   RotateCcw,
   Search,
@@ -308,14 +309,16 @@ function TripGrid({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
             >
-              <div
-                onClick={() => onSelect(trip.id)}
-                className="glass glass-hover flex cursor-pointer items-center gap-4 rounded-2xl p-5"
-              >
+              <div className="glass glass-hover flex items-center gap-2 rounded-2xl p-3 sm:p-4">
+                <button
+                  onClick={() => onSelect(trip.id)}
+                  aria-label={`Open trip ${trip.name}`}
+                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-xl p-1 text-left"
+                >
                 <ProgressRing packed={packed} total={total} />
                 <div className="min-w-0 flex-1">
-                  <h3 className="truncate font-semibold text-bark-50">{trip.name}</h3>
-                  <p className="mt-0.5 flex items-center gap-1.5 text-xs text-bark-400">
+                  <h3 className="break-words font-semibold text-bark-50">{trip.name}</h3>
+                  <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-bark-400">
                     {trip.date && (
                       <>
                         <Calendar className="h-3 w-3" />
@@ -351,12 +354,14 @@ function TripGrid({
                     )}
                   </div>
                 </div>
+                </button>
                 <button
                   onClick={e => {
                     e.stopPropagation()
                     if (confirm(`Delete trip "${trip.name}"?`)) dispatch({ type: 'deleteTrip', id: trip.id })
                   }}
-                  className="rounded-lg p-2 text-bark-500 hover:bg-red-900/30 hover:text-red-300 cursor-pointer"
+                  aria-label={`Delete trip ${trip.name}`}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-bark-400 hover:bg-red-900/30 hover:text-red-300 cursor-pointer"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -377,8 +382,19 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
   const [authOpen, setAuthOpen] = useState(false)
   const [printSheet, setPrintSheet] = useState<PrintSheetData | null>(null)
   const [view, setView] = useState<'checklist' | 'plan'>('checklist')
+  const [query, setQuery] = useState('')
+  const [packingFilter, setPackingFilter] = useState<'all' | 'unpacked' | 'packed'>('all')
+  const [editOpen, setEditOpen] = useState(false)
+  const [editedName, setEditedName] = useState(trip.name)
+  const [editedDate, setEditedDate] = useState(trip.date)
+  const [resetOpen, setResetOpen] = useState(false)
+  const [removedItem, setRemovedItem] = useState<{ item: Item; wasExtra: boolean } | null>(null)
   const authAvailable = useAuthAvailable()
   const { data: session } = useSession()
+
+  useEffect(() => {
+    if (removedItem && !trip.excluded.includes(removedItem.item.id)) setRemovedItem(null)
+  }, [trip.excluded, removedItem])
 
   const list = tripItems(trip, state.items)
   const { packed, total } = tripProgress(trip, state.items)
@@ -410,6 +426,12 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
     return [...byGroup.entries()].sort((a, b) => rank(a[0]) - rank(b[0]))
   }, [list, trip.tagIds])
 
+  const visibleGroups = groups.map(([tagId, items]): [string, Item[]] => [tagId, items.filter(item => {
+    const matchesQuery = item.name.toLowerCase().includes(query.trim().toLowerCase())
+    const matchesStatus = packingFilter === 'all' || isItemPacked(trip, item) === (packingFilter === 'packed')
+    return matchesQuery && matchesStatus
+  })]).filter(([, items]) => items.length > 0)
+
   const update = (patch: Partial<Trip>) => dispatch({ type: 'updateTrip', trip: { ...trip, ...patch } })
 
   const togglePacked = (item: Item) => {
@@ -423,11 +445,13 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
     }
   }
 
-  const removeItem = (itemId: string) =>
+  const removeItem = (item: Item) => {
+    setRemovedItem({ item, wasExtra: trip.extras.includes(item.id) })
     update({
-      excluded: [...trip.excluded, itemId],
-      extras: trip.extras.filter(id => id !== itemId),
+      excluded: [...trip.excluded, item.id],
+      extras: trip.extras.filter(id => id !== item.id),
     })
+  }
 
   const toggleTag = (tagId: string) =>
     update({
@@ -438,16 +462,16 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
     <div className="mx-auto max-w-3xl">
       <button
         onClick={onBack}
-        className="mb-4 flex items-center gap-1.5 text-sm text-bark-400 hover:text-moss-300 cursor-pointer"
+        className="mb-3 flex min-h-11 items-center gap-1.5 rounded-lg text-sm text-bark-300 hover:text-moss-300 cursor-pointer"
       >
         <ArrowLeft className="h-4 w-4" /> All trips
       </button>
 
-      <GlassPanel className="mb-6 p-6">
-        <div className="flex items-center gap-5">
+      <GlassPanel className="mb-6 p-4 sm:p-6">
+        <div className="flex items-start gap-3 sm:gap-5">
           <ProgressRing packed={packed} total={total} size={64} />
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-2xl font-bold text-bark-50">{trip.name}</h1>
+            <h1 className="break-words text-xl font-bold text-bark-50 sm:text-2xl">{trip.name}</h1>
             <p className="mt-0.5 text-sm text-bark-400">
               {trip.date &&
                 new Date(trip.date + 'T00:00').toLocaleDateString(undefined, {
@@ -469,7 +493,9 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                 </>
               )}
             </p>
-            <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          </div>
+        </div>
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
               {trip.tagIds.map(tagId => {
                 const tag = state.tags.find(t => t.id === tagId)
                 return tag ? (
@@ -491,13 +517,12 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                   ))}
               <button
                 onClick={() => setEditTags(!editTags)}
-                className="ml-1 text-xs text-bark-500 underline-offset-2 hover:text-moss-300 hover:underline cursor-pointer"
+                aria-expanded={editTags}
+                className="min-h-11 rounded-lg px-2 text-xs font-medium text-moss-300 underline underline-offset-4 hover:text-moss-200 cursor-pointer"
               >
-                {editTags ? 'done' : 'edit lists'}
+                {editTags ? 'Done editing lists' : 'Edit lists'}
               </button>
             </div>
-          </div>
-        </div>
         {outOfStock.length > 0 && (
           <div className="mt-4 flex items-center gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
             <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
@@ -508,6 +533,13 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
           </div>
         )}
         <div className="mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-4">
+          <Button variant="ghost" onClick={() => {
+            setEditedName(trip.name)
+            setEditedDate(trip.date)
+            setEditOpen(true)
+          }}>
+            <span className="flex items-center gap-1.5"><Pencil className="h-4 w-4" /> Edit trip</span>
+          </Button>
           <Button variant="ghost" onClick={() => setAddOpen(true)}>
             <span className="flex items-center gap-1.5">
               <Plus className="h-4 w-4" /> Add item
@@ -529,9 +561,9 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
               <CheckCheck className="h-4 w-4" /> Pack all
             </span>
           </Button>
-          <Button variant="ghost" onClick={() => update({ packed: {} })}>
+          <Button variant="ghost" onClick={() => setResetOpen(true)} disabled={packed === 0}>
             <span className="flex items-center gap-1.5">
-              <RotateCcw className="h-4 w-4" /> Reset
+              <RotateCcw className="h-4 w-4" /> Reset packing
             </span>
           </Button>
           {authAvailable && (
@@ -584,8 +616,8 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
         </div>
       </GlassPanel>
 
-      <div className="mb-5 flex items-center justify-between">
-        <div className="glass flex rounded-xl p-1">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+        <div className="glass flex rounded-xl p-1" aria-label="Trip view">
           {(
             [
               { id: 'checklist', label: 'Checklist', icon: ListChecks },
@@ -595,7 +627,8 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
             <button
               key={t.id}
               onClick={() => setView(t.id)}
-              className={`flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-sm font-medium transition-all cursor-pointer ${
+              aria-pressed={view === t.id}
+              className={`flex min-h-11 items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all cursor-pointer sm:px-4 ${
                 view === t.id ? 'bg-moss-500/70 text-moss-50 shadow' : 'text-bark-400 hover:text-bark-200'
               }`}
             >
@@ -609,6 +642,35 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
         )}
       </div>
 
+      {removedItem && (
+        <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-moss-400/30 bg-moss-500/10 px-4 py-2 text-sm text-bark-200">
+          <span>{removedItem.item.name} removed from this trip.</span>
+          <Button variant="ghost" onClick={() => {
+            update({
+              excluded: trip.excluded.filter(id => id !== removedItem.item.id),
+              extras: removedItem.wasExtra ? [...new Set([...trip.extras, removedItem.item.id])] : trip.extras,
+            })
+            setRemovedItem(null)
+          }}>Undo</Button>
+        </div>
+      )}
+
+      {view === 'checklist' && (
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-bark-400" />
+            <input aria-label="Search trip items" className={`${inputClass} pl-9`} placeholder="Search trip items…" value={query} onChange={e => setQuery(e.target.value)} />
+          </div>
+          <div className="flex flex-wrap gap-1.5" aria-label="Packing status">
+            {(['all', 'unpacked', 'packed'] as const).map(filter => (
+              <Chip key={filter} active={packingFilter === filter} onClick={() => setPackingFilter(filter)}>
+                {filter === 'all' ? `All (${total})` : filter === 'unpacked' ? `To pack (${total - packed})` : `Packed (${packed})`}
+              </Chip>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* No AnimatePresence here: layout-animated rows inside the plan view can
           stall its exit and leave the next view unmounted. Keyed remount only. */}
       <motion.div
@@ -621,7 +683,14 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
             <PackingPlan trip={trip} items={list} onUpdate={update} />
           ) : (
       <div className="space-y-5">
-        {groups.map(([groupTag, items]) => {
+        {visibleGroups.length === 0 && (
+          <GlassPanel className="p-6 text-center">
+            <p className="font-medium text-bark-100">{list.length === 0 ? 'Your packing list is empty' : 'No items match these filters'}</p>
+            <p className="mt-1 text-sm text-bark-400">{list.length === 0 ? 'Add an item or choose a list to start packing.' : 'Try another search or show all packing statuses.'}</p>
+            {list.length > 0 && <Button variant="ghost" className="mt-4" onClick={() => { setQuery(''); setPackingFilter('all') }}>Clear filters</Button>}
+          </GlassPanel>
+        )}
+        {visibleGroups.map(([groupTag, items]) => {
           const tag = state.tags.find(t => t.id === groupTag)
           const groupPacked = items.filter(i => isItemPacked(trip, i)).length
           return (
@@ -640,11 +709,11 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                   const isPacked = isItemPacked(trip, item)
                   return (
                     <div key={item.id}>
-                    <div
-                      onClick={() => togglePacked(item)}
-                      className="group flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors hover:bg-white/[0.04]"
-                    >
+                    <div className="flex items-center gap-1 px-2 transition-colors hover:bg-white/[0.04] sm:px-3">
+                      <label className="flex min-h-12 min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-lg px-1 py-2.5 focus-within:outline focus-within:outline-2 focus-within:outline-moss-400">
+                      <input type="checkbox" className="sr-only" checked={isPacked} onChange={() => togglePacked(item)} aria-label={`Pack ${item.name}`} />
                       <span
+                        aria-hidden="true"
                         className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-all ${
                           isPacked
                             ? 'border-moss-400 bg-moss-500/80 text-bark-950'
@@ -654,20 +723,20 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                         {isPacked && <Check className="h-3.5 w-3.5" />}
                       </span>
                       <span
-                        className={`flex-1 text-sm transition-colors ${
+                        className={`min-w-0 flex-1 break-words text-sm transition-colors ${
                           isPacked ? 'text-bark-500 line-through' : 'text-bark-100'
                         }`}
                       >
                         {item.name}
                       </span>
                       {item.weight != null && (
-                        <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] tabular-nums text-bark-500">
+                        <span className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[11px] tabular-nums text-bark-400">
                           {formatItemWeight(item)}
                         </span>
                       )}
                       {item.kind === 'consumable' && item.stock === 0 ? (
-                        <span className="flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
-                          <AlertTriangle className="h-3 w-3" /> Out of stock
+                        <span className="flex shrink-0 items-center gap-1 rounded-full bg-amber-500/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300" title="Out of stock">
+                          <AlertTriangle className="h-3 w-3" /><span className="hidden sm:inline">Out of stock</span><span className="sm:hidden">Stock 0</span>
                         </span>
                       ) : (
                         item.stock !== null && item.stock > 1 && (
@@ -676,12 +745,11 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                           </span>
                         )
                       )}
+                      </label>
                       <button
-                        onClick={e => {
-                          e.stopPropagation()
-                          removeItem(item.id)
-                        }}
-                        className="rounded p-1 text-bark-600 opacity-40 transition-opacity hover:text-red-300 hover:opacity-100 group-hover:opacity-70 cursor-pointer"
+                        onClick={() => removeItem(item)}
+                        aria-label={`Remove ${item.name} from this trip`}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-bark-400 hover:bg-red-900/20 hover:text-red-300 cursor-pointer"
                         title="Remove from this trip"
                       >
                         <Minus className="h-4 w-4" />
@@ -692,12 +760,13 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                         const key = ingredientKey(item.id, ing)
                         const on = !!trip.packed[key]
                         return (
-                          <div
+                          <label
                             key={key}
-                            onClick={() => update({ packed: { ...trip.packed, [key]: !on } })}
-                            className="flex cursor-pointer items-center gap-2.5 py-1.5 pl-12 pr-4 transition-colors hover:bg-white/[0.04]"
+                            className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg py-2 pl-12 pr-4 transition-colors hover:bg-white/[0.04] focus-within:outline focus-within:outline-2 focus-within:outline-moss-400"
                           >
+                            <input type="checkbox" className="sr-only" checked={on} onChange={() => update({ packed: { ...trip.packed, [key]: !on } })} aria-label={`Pack ${ing} for ${item.name}`} />
                             <span
+                              aria-hidden="true"
                               className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-all ${
                                 on ? 'border-moss-400 bg-moss-500/70 text-bark-950' : 'border-white/20 bg-white/5'
                               }`}
@@ -707,7 +776,7 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
                             <span className={`text-[13px] ${on ? 'text-bark-500 line-through' : 'text-bark-300'}`}>
                               {ing}
                             </span>
-                          </div>
+                          </label>
                         )
                       })}
                     </div>
@@ -722,6 +791,34 @@ function TripDetail({ trip, onBack }: { trip: Trip; onBack: () => void }) {
       </motion.div>
 
       <AddItemModal trip={trip} open={addOpen} onClose={() => setAddOpen(false)} />
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="Edit trip">
+        <form className="space-y-4" onSubmit={e => {
+          e.preventDefault()
+          if (!editedName.trim()) return
+          update({ name: editedName.trim(), date: editedDate })
+          setEditOpen(false)
+        }}>
+          <div>
+            <label htmlFor="edit-trip-name" className="mb-1.5 block text-xs font-medium text-bark-400">Trip name</label>
+            <input id="edit-trip-name" autoFocus required className={inputClass} value={editedName} onChange={e => setEditedName(e.target.value)} />
+          </div>
+          <div>
+            <label htmlFor="edit-trip-date" className="mb-1.5 block text-xs font-medium text-bark-400">Date (optional)</label>
+            <input id="edit-trip-date" type="date" className={inputClass} value={editedDate} onChange={e => setEditedDate(e.target.value)} />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={!editedName.trim()}>Save changes</Button>
+          </div>
+        </form>
+      </Modal>
+      <Modal open={resetOpen} onClose={() => setResetOpen(false)} title="Reset packing progress?">
+        <p className="text-sm text-bark-300">This will uncheck all {packed} packed {packed === 1 ? 'item' : 'items'} in this trip.</p>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <Button variant="ghost" onClick={() => setResetOpen(false)}>Keep progress</Button>
+          <Button variant="danger" onClick={() => { update({ packed: {} }); setResetOpen(false) }}>Reset packing</Button>
+        </div>
+      </Modal>
       <ShareModal
         open={shareOpen}
         onClose={() => setShareOpen(false)}
@@ -749,6 +846,7 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
   const [newTags, setNewTags] = useState<string[]>([])
   const [newIngredients, setNewIngredients] = useState<string[]>([])
   const [newListName, setNewListName] = useState<string | null>(null)
+  const [addedName, setAddedName] = useState('')
 
   const createList = () => {
     const name = newListName?.trim()
@@ -764,7 +862,7 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
     i => !currentIds.has(i.id) && i.name.toLowerCase().includes(query.toLowerCase()),
   )
 
-  const add = (itemId: string) =>
+  const add = (itemId: string, name?: string) => {
     dispatch({
       type: 'updateTrip',
       trip: {
@@ -773,6 +871,8 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
         excluded: trip.excluded.filter(id => id !== itemId),
       },
     })
+    setAddedName(name ?? state.items.find(item => item.id === itemId)?.name ?? 'Item')
+  }
 
   const startCreating = () => {
     setNewName(query.trim())
@@ -783,6 +883,7 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
   }
 
   const createAndAdd = () => {
+    if (!newName.trim()) return
     const item: Item = {
       id: makeId(newName),
       name: newName.trim(),
@@ -792,7 +893,7 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
       ingredients: newKind === 'meal' && newIngredients.length > 0 ? newIngredients : undefined,
     }
     dispatch({ type: 'addItem', item })
-    add(item.id)
+    add(item.id, item.name)
     setCreating(false)
     setQuery('')
   }
@@ -800,17 +901,19 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
   const close = () => {
     setCreating(false)
     setQuery('')
+    setAddedName('')
     onClose()
   }
 
   return (
-    <Modal open={open} onClose={close} title="Add gear to this trip">
+    <Modal open={open} onClose={close} title="Add items to this trip">
       {creating ? (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-2">
-              <label className="mb-1.5 block text-xs font-medium text-bark-400">Name</label>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="sm:col-span-2">
+              <label htmlFor="trip-item-name" className="mb-1.5 block text-xs font-medium text-bark-400">Name</label>
               <input
+                id="trip-item-name"
                 autoFocus
                 className={inputClass}
                 value={newName}
@@ -855,6 +958,7 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
               ) : (
                 <input
                   autoFocus
+                  aria-label="New list name"
                   className="w-32 rounded-full border border-moss-400/50 bg-white/5 px-3 py-1 text-xs text-bark-50 outline-none placeholder-bark-500"
                   placeholder="List name…"
                   value={newListName}
@@ -872,7 +976,7 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
               joins this trip, grouped under Other.
             </p>
           </div>
-          <div className="flex justify-end gap-2 pt-1">
+          <div className="flex flex-wrap justify-end gap-2 pt-1">
             <Button variant="ghost" onClick={() => setCreating(false)}>Back</Button>
             <Button onClick={createAndAdd} disabled={newName.trim() === ''}>
               Create & add to trip
@@ -881,10 +985,12 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
         </div>
       ) : (
         <>
+          {addedName && <p role="status" className="mb-3 rounded-lg bg-moss-500/15 px-3 py-2 text-sm text-moss-200">{addedName} added to this trip.</p>}
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-bark-500" />
             <input
               autoFocus
+              aria-label="Search available items"
               className="w-full rounded-xl border border-white/10 bg-white/5 py-2.5 pl-9 pr-3 text-sm text-bark-50 placeholder-bark-500 outline-none focus:border-moss-400/50"
               placeholder="Search your gear…"
               value={query}
@@ -896,11 +1002,11 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
               <button
                 key={item.id}
                 onClick={() => add(item.id)}
-                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-bark-200 transition-colors hover:bg-moss-500/15 hover:text-moss-200 cursor-pointer"
+                className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-bark-200 transition-colors hover:bg-moss-500/15 hover:text-moss-200 cursor-pointer"
               >
                 <Plus className="h-4 w-4 text-moss-400" />
-                <span className="flex-1">{item.name}</span>
-                <span className="text-[10px] text-bark-500">{item.tags.join(', ')}</span>
+                <span className="min-w-0 flex-1 break-words">{item.name}</span>
+                <span className="max-w-[40%] text-right text-[11px] text-bark-400">{item.tags.map(id => state.tags.find(tag => tag.id === id)?.name ?? id).join(', ')}</span>
               </button>
             ))}
             <button
@@ -913,6 +1019,7 @@ function AddItemModal({ trip, open, onClose }: { trip: Trip; open: boolean; onCl
               </span>
             </button>
           </div>
+          <div className="mt-4 flex justify-end"><Button onClick={close}>Done</Button></div>
         </>
       )}
     </Modal>

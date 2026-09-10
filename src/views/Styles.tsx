@@ -29,57 +29,62 @@ export function StylesView() {
       <div className="space-y-10">
         {state.wizard.map(step => (
           <section key={step.id}>
-            <div className="mb-3 flex items-center justify-between">
-              <div>
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
                 <h2 className="font-semibold text-bark-50">{step.title}</h2>
-                <p className="text-xs text-bark-500">
+                <p className="mt-1 text-xs leading-relaxed text-bark-400">
                   "{step.prompt}" · {step.multi ? 'multiple choice' : 'single choice'}
                   {step.optional ? ' · skippable' : ''}
                 </p>
               </div>
-              <Button variant="ghost" onClick={() => setEditing({ stepId: step.id, card: null })}>
-                <span className="flex items-center gap-1.5">
-                  <Plus className="h-4 w-4" /> Add card
+              <Button variant="ghost" className="shrink-0" onClick={() => setEditing({ stepId: step.id, card: null })}>
+                <span className="flex items-center gap-1.5 whitespace-nowrap">
+                  <Plus className="h-4 w-4 shrink-0" /> Add card
                 </span>
               </Button>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               {step.cards.map(card => (
-                <GlassPanel key={card.id} className="glass-hover flex items-start gap-3 p-4">
+                <GlassPanel key={card.id} className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-3 p-4">
                   <div className="rounded-xl bg-moss-500/15 p-2.5 text-moss-300">
                     <DynamicIcon name={card.icon} className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-bark-50">{card.title}</h3>
-                    <p className="mt-0.5 text-xs text-bark-400">{card.subtitle}</p>
+                    <h3 className="break-words font-semibold text-bark-50 [overflow-wrap:anywhere]">{card.title}</h3>
+                    <p className="mt-0.5 break-words text-sm leading-relaxed text-bark-300 [overflow-wrap:anywhere]">{card.subtitle}</p>
                     <div className="mt-2 flex flex-wrap gap-1">
                       {card.tags.length === 0 && (
-                        <span className="text-[10px] italic text-bark-600">adds no lists</span>
+                        <span className="text-xs italic text-bark-400">Adds no lists</span>
                       )}
                       {card.tags.map(tagId => {
                         const tag = state.tags.find(t => t.id === tagId)
                         return (
-                          <span key={tagId} className="rounded-full bg-moss-500/10 px-2 py-0.5 text-[10px] text-moss-300">
+                          <span key={tagId} className="max-w-full break-words rounded-full bg-moss-500/10 px-2 py-0.5 text-xs text-moss-300 [overflow-wrap:anywhere]">
                             {tag?.name ?? tagId}
                           </span>
                         )
                       })}
                     </div>
                   </div>
+                  <div className="col-span-2 flex justify-end gap-1 border-t border-white/10 pt-1">
                   <button
                     onClick={() => setEditing({ stepId: step.id, card })}
-                    className="rounded p-1.5 text-bark-500 hover:bg-white/10 hover:text-bark-100 cursor-pointer"
+                    aria-label={`Edit ${card.title}`}
+                    className="flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-sm text-bark-300 hover:bg-white/10 hover:text-bark-100 cursor-pointer"
                   >
-                    <Pencil className="h-4 w-4" />
+                    <Pencil className="h-4 w-4" /> Edit
                   </button>
                   <button
                     onClick={() => {
                       if (confirm(`Delete the "${card.title}" card?`)) deleteCard(step.id, card.id)
                     }}
-                    className="rounded p-1.5 text-bark-500 hover:bg-red-900/30 hover:text-red-300 cursor-pointer"
+                    aria-label={`Delete ${card.title}`}
+                    title={`Delete ${card.title}`}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-bark-300 hover:bg-red-900/30 hover:text-red-300 cursor-pointer"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
+                  </div>
                 </GlassPanel>
               ))}
             </div>

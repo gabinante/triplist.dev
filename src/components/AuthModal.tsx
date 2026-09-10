@@ -5,6 +5,7 @@ import { LogIn, MailCheck, TentTree, UserPlus, X } from 'lucide-react'
 import { authClient, signIn, signUp } from '../lib/auth-client'
 import { useStore } from '../store'
 import { Button, inputClass } from './ui'
+import { useDialog } from '../lib/useDialog'
 
 /** `verify`: account exists but the email isn't confirmed yet — sign-in is refused until it is. */
 type AuthMode = 'signin' | 'signup' | 'forgot' | 'reset' | 'verify'
@@ -31,6 +32,7 @@ export function AuthModal({
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const dialogRef = useDialog(open, onClose)
 
   useEffect(() => {
     if (open) {
@@ -130,14 +132,21 @@ export function AuthModal({
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={dialogRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label={heading}
+          tabIndex={-1}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-50 overflow-y-auto"
+          className="fixed inset-0 z-50 overflow-y-auto bg-bark-950"
         >
           <div className="ambient-fill" />
           <button
+            type="button"
+            aria-label="Close sign in"
             onClick={onClose}
             className="fixed right-5 top-5 z-10 rounded-xl p-2 text-bark-400 transition-colors hover:bg-white/10 hover:text-bark-100 cursor-pointer"
           >
@@ -160,7 +169,7 @@ export function AuthModal({
                 </span>
               </div>
 
-              <div className="glass rounded-3xl p-8">
+              <div className="glass rounded-3xl p-5 sm:p-8">
                 <h1 className="text-2xl font-bold text-bark-50">{heading}</h1>
                 <p className="mt-2 mb-6 text-sm leading-relaxed text-bark-400">{subtext}</p>
 
@@ -169,6 +178,8 @@ export function AuthModal({
                     <div>
                       <label className="mb-1.5 block text-xs font-medium text-bark-400">Name</label>
                       <input
+                        aria-label="Name"
+                        autoComplete="name"
                         className={inputClass}
                         value={name}
                         onChange={e => setName(e.target.value)}
@@ -187,6 +198,9 @@ export function AuthModal({
                       <input
                         autoFocus
                         type="email"
+                        aria-label="Email"
+                        autoComplete="email"
+                        inputMode="email"
                         className={inputClass}
                         value={email}
                         onChange={e => setEmail(e.target.value)}
@@ -202,6 +216,8 @@ export function AuthModal({
                       </label>
                       <input
                         type="password"
+                        aria-label={mode === 'reset' ? 'New password' : 'Password'}
+                        autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
                         className={inputClass}
                         value={password}
                         onChange={e => setPassword(e.target.value)}
@@ -223,12 +239,12 @@ export function AuthModal({
                     </div>
                   )}
                   {notice && (
-                    <p className="rounded-xl border border-moss-400/30 bg-moss-500/10 px-3 py-2 text-sm text-moss-300">
+                    <p role="status" className="rounded-xl border border-moss-400/30 bg-moss-500/10 px-3 py-2 text-sm text-moss-300">
                       {notice}
                     </p>
                   )}
                   {error && (
-                    <p className="rounded-xl border border-red-500/30 bg-red-900/20 px-3 py-2 text-sm text-red-300">
+                    <p role="alert" className="rounded-xl border border-red-500/30 bg-red-900/20 px-3 py-2 text-sm text-red-300">
                       {error}
                     </p>
                   )}

@@ -1,0 +1,170 @@
+import assert from 'node:assert/strict'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { chromium, baseURL as defaultURL } from './browser.mjs'
+
+const baseURL = process.env.QA_BASE_URL ?? defaultURL
+const outDir = process.env.QA_OUTPUT_DIR ?? '/private/tmp/triplist-ux/trips'
+await mkdir(outDir, { recursive: true })
+const browser = await chromium.launch({ headless: true })
+const results = []
+let activePage
+let activeVariant
+const cases = process.env.QA_CASE ? [process.env.QA_CASE] : ['desktop-dark', 'desktop-light', 'mobile-dark', 'mobile-light']
+try {
+  for (const variant of cases) {
+    const [device, theme] = variant.split('-')
+    const viewport = device === 'mobile' ? { width: 390, height: 844 } : { width: 1440, height: 1000 }
+    const context = await browser.newContext({ viewport, colorScheme: theme, reducedMotion: 'reduce', isMobile: device === 'mobile', hasTouch: device === 'mobile' })
+    await context.addInitScript(theme => {
+      localStorage.setItem('triplist-welcomed', '1')
+      localStorage.setItem('triplist-theme', theme)
+    }, theme)
+    const page = await context.newPage()
+    activePage = page
+    activeVariant = variant
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    const shots = []
+    const shot = async name => {
+      await page.waitForTimeout(250)
+      const path = `${outDir}/${variant}-${name}.png`
+      await page.screenshot({ path })
+      const overflow = { viewport: viewport.width, width: await page.evaluate(() => document.documentElement.scrollWidth) }
+      assert.ok(overflow.width <= overflow.viewport, `${variant}/${name}: horizontal overflow ${JSON.stringify(overflow)}`)
+      shots.push(path)
+    }
+    const click = name => page.locator('main').getByRole('button', { name, exact: true }).click()
+    await page.goto(baseURL)
+    await page.getByRole('heading', { name: 'What kind of trip is this?' }).waitFor()
+    await shot('01-trip-style')
+    assert.equal(await page.getByRole('button', { name: 'Next', exact: true }).isDisabled(), true)
+    const nextBounds = await page.getByRole('button', { name: 'Next', exact: true }).boundingBox()
+    assert.ok(nextBounds.y >= 0 && nextBounds.y + nextBounds.height <= viewport.height, 'Wizard Next must be visible before scrolling')
+    await click('Car Camping')
+    assert.equal(await page.getByRole('button', { name: 'Car Camping', exact: true }).getAttribute('aria-pressed'), 'true')
+    await click('Next')
+    await page.getByRole('heading', { name: 'Where are you staying — and what does it offer?' }).waitFor()
+    await shot('02-accommodations')
+    await click('Cooking Camp')
+    await click('Next')
+    await page.getByRole('heading', { name: "What's cooking?" }).waitFor()
+    await shot('03-meals')
+    await click('Camp Cooking')
+    await click('Next')
+    await page.getByRole('heading', { name: "Who's going?" }).waitFor()
+    await shot('04-crew')
+    await click('With the Crew')
+    await click('Back')
+    await page.getByRole('heading', { name: "What's cooking?" }).waitFor()
+    assert.equal(await page.getByRole('button', { name: 'Camp Cooking', exact: true }).getAttribute('aria-pressed'), 'true')
+    await click('Next')
+    await page.getByRole('heading', { name: "Who's going?" }).waitFor()
+    assert.equal(await page.getByRole('button', { name: 'With the Crew', exact: true }).getAttribute('aria-pressed'), 'true')
+    await click('Next')
+    await page.getByRole('heading', { name: 'Name your trip' }).waitFor()
+    assert.equal(await page.getByRole('button', { name: 'Create trip', exact: true }).isDisabled(), true)
+    await page.getByLabel('Trip name', { exact: true }).fill(`QA ${variant} lake weekend`)
+    await page.getByLabel('Date (optional)', { exact: true }).fill('2026-10-15')
+    await shot('05-review')
+    await click('Back')
+    await page.getByRole('heading', { name: "Who's going?" }).waitFor()
+    await click('Next')
+    await page.getByRole('heading', { name: 'Name your trip' }).waitFor()
+    assert.equal(await page.getByLabel('Trip name', { exact: true }).inputValue(), `QA ${variant} lake weekend`)
+    await click('Create trip')
+    await page.getByRole('heading', { name: `QA ${variant} lake weekend`, exact: true }).waitFor()
+    await shot('06-trip-detail')
+    await click('Edit trip')
+    const edit = page.getByRole('dialog', { name: 'Edit trip', exact: true })
+    await edit.waitFor()
+    const renamed = `QA ${variant} Lake Weekend with friends and a comfortably readable long trip name`
+    await edit.getByLabel('Trip name', { exact: true }).fill(renamed)
+    await edit.getByLabel('Date (optional)', { exact: true }).fill('2026-10-16')
+    await shot('07-edit-trip')
+    await edit.getByRole('button', { name: 'Save changes', exact: true }).click()
+    await page.getByRole('heading', { name: renamed, exact: true }).waitFor()
+    await click('Edit lists')
+    await shot('08-edit-lists')
+    await click('Festival')
+    await click('Festival')
+    await click('Done editing lists')
+
+    const firstCheckbox = page.getByRole('checkbox').first()
+    const itemName = (await firstCheckbox.getAttribute('aria-label')).replace(/^Pack /, '')
+    await firstCheckbox.focus()
+    await page.keyboard.press('Space')
+    assert.equal(await firstCheckbox.isChecked(), true)
+    await page.getByRole('button', { name: /^To pack \(/ }).click()
+    assert.equal(await page.getByRole('checkbox', { name: `Pack ${itemName}`, exact: true }).count(), 0)
+    await page.getByRole('button', { name: /^Packed \(/ }).click()
+    assert.equal(await page.getByRole('checkbox', { name: `Pack ${itemName}`, exact: true }).isChecked(), true)
+    await page.getByLabel('Search trip items').fill('not-a-real-item-qa')
+    await page.getByText('No items match these filters', { exact: true }).waitFor()
+    await shot('09-filter-empty')
+    await click('Clear filters')
+    await page.getByLabel('Search trip items').fill(itemName)
+    await shot('10-checklist-filtered')
+    await click(`Remove ${itemName} from this trip`)
+    assert.equal(await page.getByRole('checkbox', { name: `Pack ${itemName}`, exact: true }).count(), 0)
+    await click('Undo')
+    assert.equal(await page.getByRole('checkbox', { name: `Pack ${itemName}`, exact: true }).count(), 1)
+    await click(`Remove ${itemName} from this trip`)
+    await click('Add item')
+    const add = page.getByRole('dialog', { name: 'Add items to this trip', exact: true })
+    await add.getByLabel('Search available items').fill(itemName)
+    await shot('11-add-existing-item')
+    await add.getByRole('button').filter({ has: page.getByText(itemName, { exact: true }) }).click()
+    await add.getByRole('status').filter({ hasText: `${itemName} added to this trip.` }).waitFor()
+    await add.getByLabel('Search available items').fill('QA trail notebook')
+    await add.getByRole('button', { name: 'Create "QA trail notebook" as new gear', exact: true }).click()
+    await shot('12-create-item')
+    await add.getByRole('button', { name: 'Create & add to trip', exact: true }).click()
+    await add.getByRole('status').filter({ hasText: 'QA trail notebook added to this trip.' }).waitFor()
+    await add.getByRole('button', { name: 'Done', exact: true }).click()
+    await page.getByLabel('Search trip items').fill('QA trail notebook')
+    await page.getByRole('checkbox', { name: 'Pack QA trail notebook', exact: true }).waitFor()
+    await page.getByLabel('Search trip items').fill('')
+    const ingredient = page.getByRole('checkbox', { name: /^Pack .* for / }).first()
+    if (await ingredient.count()) {
+      await ingredient.focus()
+      await page.keyboard.press('Space')
+      assert.equal(await ingredient.isChecked(), true)
+    }
+    await click('Pack all')
+    await page.getByRole('button', { name: 'To pack (0)', exact: true }).waitFor()
+    await click('Reset packing')
+    await shot('13-reset-confirmation')
+    await page.getByRole('dialog', { name: 'Reset packing progress?' }).getByRole('button', { name: 'Keep progress' }).click()
+    await page.getByRole('button', { name: 'To pack (0)', exact: true }).waitFor()
+    await click('Reset packing')
+    await page.getByRole('dialog', { name: 'Reset packing progress?' }).getByRole('button', { name: 'Reset packing', exact: true }).click()
+    await page.getByRole('button', { name: 'Packed (0)', exact: true }).waitFor()
+    await page.evaluate(() => window.scrollTo(0, 0))
+    await shot('14-trip-detail-after')
+    await click('All trips')
+    await shot('15-trips-grid')
+    await page.reload()
+    await page.getByRole('button', { name: 'My Trips', exact: true }).click()
+    await page.getByRole('button', { name: `Open trip ${renamed}`, exact: true }).focus()
+    await page.keyboard.press('Enter')
+    await page.getByRole('heading', { name: renamed, exact: true }).waitFor()
+    await click('All trips')
+    page.once('dialog', dialog => dialog.accept())
+    await click(`Delete trip ${renamed}`)
+    await page.getByRole('heading', { name: 'No trips yet' }).waitFor()
+    await shot('16-trips-empty')
+    assert.deepEqual(errors, [], `Page errors for ${variant}`)
+    results.push({ variant, passed: true, screenshots: shots, pageErrors: errors })
+    console.log(`PASS ${variant}: wizard, review/back, create/edit trip, list edits, keyboard packing, search/status, remove/undo/re-add, new item, pack/reset, grid/delete; ${shots.length} screenshots`)
+    await context.close()
+  }
+  await writeFile(`${outDir}/results.json`, JSON.stringify(results, null, 2))
+} catch (error) {
+  if (activePage && !activePage.isClosed()) {
+    await activePage.screenshot({ path: `${outDir}/${activeVariant}-failure.png` }).catch(() => {})
+    console.error(await activePage.locator("main").innerText().catch(() => "Page unavailable"))
+  }
+  throw error
+} finally {
+  await browser.close()
+}
